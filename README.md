@@ -12,7 +12,7 @@
 - **Phase:** demo build-out COMPLETE (pre-deployment, $0). Nothing is deployed — no Supabase project, no Vercel.
 - **Built:** full clickable CRM at `localhost:3000` — dashboard/live feed/at-risk, members, classes (weekly grid + rosters + waitlist), attendance analytics, payments, plans, leads Kanban, coaches, announcements, reports (+CSV), settings, login screen (mock) — plus phone-framed member-app preview at `/app` (doors splash, booking, QR). All demo-mode, in-memory data.
 - **Decided sequence (2026-07-03):** 1) ✅ demo screens → 2) set up FREE-tier Supabase (ca-central-1) + FREE Vercel → 3) deploy. Free-tier caveats: Supabase free pauses after 7 days of inactivity + no backups; Vercel Hobby is non-commercial only — must move to Pro when G1 starts paying.
-- **Next:** show G1 the demo, then DEPLOY.md (free-tier track). Real auth (B1) is the main code work at deployment.
+- **Next:** DEPLOY.md free-tier protocol in progress (user driving: Supabase + Vercel accounts created 2026-07-03). Deploying in demo mode first (no env vars = live shareable demo); real auth (B1) is the code work that gates real data.
 - **Fixed 2026-07-03:** lockfile synced to Next 16; `typescript` pinned to a real version (^5.9.3). `pnpm install` once and you're current.
 - **Last updated:** 2026-07-03 (demo build-out: 11 new screens; docs reorganized — root = README/FEATURES/DEPLOY/CLAUDE, rest in `docs/`).
 

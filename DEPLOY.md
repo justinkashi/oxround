@@ -1,11 +1,67 @@
 # OxRound — Live Deployment Checklist
 
-> Written 2026-07-03. Goal: demo at localhost:3000 → live CRM for the G1 owner + member app for members.
-> Honest status first: the CRM's 4 demo-slice features are built and verified, but it has **no login/auth UI** (runs in demo mode), and the **member app is not scaffolded** (README placeholder only). Those are the two real work items — everything else is configuration.
-
-Sequencing: **CRM live first (~1 week of work), member app second (~3–6 weeks).** The CRM alone already delivers owner value (members, payments, attendance, announcements); members check in with printed QR cards until the app ships.
+> Written 2026-07-03; free-tier protocol added same day after the free-first decision.
+> **What this file is:** the deployment RUNBOOK. You read it top-to-bottom when deploying and tick `[ ]` → `[x]` as you complete steps. Its *content* only changes when the deployment plan itself changes (e.g., Pro → free tier, or a new decision in docs/DECISIONS.md). It is NOT a status file — current phase always lives in README.md.
 
 ---
+
+## FREE-TIER PROTOCOL (current path — decided 2026-07-03)
+
+Runs the whole pilot at $0: Supabase Free (ca-central-1) + Vercel Hobby.
+Known free-tier limits (accepted): Supabase pauses after **7 days of no database activity** (unpause manually in the dashboard) and has **no backups**; Vercel Hobby is **non-commercial only** — the moment G1 pays, upgrade to Vercel Pro ($20/mo) and consider Supabase Pro ($25/mo, backups + no pausing).
+
+### Step 1 — GitHub (once)
+
+- [ ] 1.1 Repo pushed to GitHub as **private**. Verify no `.env*` file was ever committed (`.gitignore` already covers it): on github.com press `t` and type `.env` — nothing should appear.
+
+### Step 2 — Supabase project (~20 min, all in the dashboard + terminal)
+
+- [ ] 2.1 supabase.com → **New project**. Name: `oxround`. **Region: Canada Central (ca-central-1)** — non-negotiable, Law 25 (docs/STACK_REVIEW.md R5). Plan: Free. Generate a strong database password and save it in your password manager — you'll need it in 2.3.
+- [ ] 2.2 Install the Supabase CLI on your Mac: `brew install supabase/tap/supabase` (or without Homebrew: `npm i -g supabase`). Then `supabase login` — opens your browser.
+- [ ] 2.3 In your terminal, at the repo root: `supabase link --project-ref <REF>` — the REF is the 20-character code in your project's URL (`supabase.com/dashboard/project/<REF>`). It asks for the database password from 2.1.
+- [ ] 2.4 `supabase db push` — applies all three migrations (schema + RLS + token hook). **Never run `seed.sql` on this project** — it contains demo check-in tokens.
+- [ ] 2.5 `supabase functions deploy check-in` — deploys the check-in Edge Function. (The `auth-hook` Edge Function is superseded by migration 0003's Postgres function — faster, no webhook secret. Don't deploy it; the folder stays in the repo as history.)
+- [ ] 2.6 Dashboard → **Authentication → Hooks** → **Customize Access Token (JWT) Claims** → Hook type: **Postgres** → schema `public`, function `custom_access_token_hook` → Create hook. ⚠️ Skipping this breaks everything silently: it's what puts `gym_id` + roles into the login token, and every RLS rule depends on it.
+- [ ] 2.7 Dashboard → **Storage** → create bucket `announcements` (toggle **Public** ON) and bucket `waivers` (Public OFF).
+- [ ] 2.8 Dashboard → **Authentication → Sign In / Providers** → Email: ON. Note: the built-in email sender is rate-limited to a few emails/hour — fine while only the owner logs in; switch to Resend SMTP before members use email login.
+- [ ] 2.9 Dashboard → **Settings → API** (or **Settings → API Keys**): copy the **Project URL** and the **anon/public key** somewhere safe. These are the two values Vercel will need later (they're safe to expose in a browser — the secret one is `service_role`, never copy that anywhere).
+- [ ] 2.10 Pause prevention: put a weekly reminder in your phone to open the CRM (any real page-load of live data counts), or accept manually unpausing after idle weeks.
+
+### Step 3 — Vercel (~10 min)
+
+- [ ] 3.1 vercel.com → **Add New… → Project** → Import the `oxround` GitHub repo.
+- [ ] 3.2 **Root Directory: `apps/web`** (it's a monorepo — this points Vercel at the Next.js app; it still auto-detects pnpm from the root lockfile). Framework preset: Next.js (auto). Leave build settings default.
+- [ ] 3.3 **Environment variables: add NONE for now.** No Supabase keys ⇒ the site runs in demo mode ⇒ you get a live, clickable, fake-data demo at a shareable URL. This is intentional: with the keys set, every page would show empty tables because the real login (Step 5) isn't built yet.
+- [ ] 3.4 Click **Deploy**. First build takes 2–3 min. You get `https://oxround-….vercel.app`.
+- [ ] 3.5 Smoke test the URL on your phone: dashboard, members, classes grid, a session roster, `/app` preview with the doors splash.
+
+**🎉 Milestone: a shareable live demo.** Every `git push` to main now auto-deploys.
+
+### Step 4 — Domain (optional now, 15 min when ready)
+
+- [ ] 4.1 Vercel project → Settings → Domains → add `app.oxround.com` → add the CNAME record it shows you at your domain registrar. SSL is automatic.
+
+### Step 5 — Real auth = the go-live gate (the remaining CODE work, ~3–5 days)
+
+Everything above ships a demo. Real G1 data requires:
+
+- [ ] 5.1 Build B1 (below): magic-link login with `@supabase/ssr`, session guard on all pages, logout. The mock login page at `/login` is the UI starting point.
+- [ ] 5.2 Only then: add `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel → Settings → Environment Variables (Production + Preview) → Redeploy.
+- [ ] 5.3 Invite the G1 owner: Supabase → Authentication → Users → Invite user (his email). Then create the G1 gym row + his `gym_members` row with `roles={owner}` (prod-safe SQL, no seed.sql).
+- [ ] 5.4 Verify AS HIM from the app (not the SQL editor): log in → add member → print QR → record payment → post announcement.
+- [ ] 5.5 Law 25 minimum before real member data: privacy policy page linked in the footer + named privacy officer (you).
+
+### Upgrade triggers (when free stops being correct)
+
+| Trigger | Action |
+|---|---|
+| G1 starts paying you | Vercel Hobby → Pro ($20/mo) — ToS requirement, same day |
+| Real member PII in the DB | Supabase Free → Pro ($25/mo) — backups + no pausing |
+| Members log in by email | Resend SMTP (free tier) replaces built-in sender |
+
+---
+
+## Original Pro-tier plan (reference — superseded for the pilot by the protocol above; the B/C/D phases below still apply when you reach them)
 
 ## Phase A — Backend live (half a day, config only)
 
