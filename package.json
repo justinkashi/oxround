@@ -1,0 +1,11 @@
+{
+  "name": "oxround",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @oxround/web dev",
+    "build": "pnpm --filter @oxround/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "packageManager": "pnpm@10.34.4"
+}
