@@ -10,8 +10,15 @@ export const metadata: Metadata = {
 const nav = [
   { href: "/", label: "Dashboard" },
   { href: "/members", label: "Members" },
+  { href: "/classes", label: "Classes" },
   { href: "/attendance", label: "Attendance" },
+  { href: "/payments", label: "Payments" },
+  { href: "/plans", label: "Plans" },
+  { href: "/leads", label: "Leads" },
+  { href: "/coaches", label: "Coaches" },
   { href: "/announcements", label: "Announcements" },
+  { href: "/reports", label: "Reports" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -38,6 +45,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Link>
               ))}
             </nav>
+            <div className="mt-8 space-y-1 border-t border-neutral-200 pt-4">
+              <Link href="/app" className="block rounded-md px-3 py-2 text-sm font-medium text-neutral-500 hover:bg-neutral-50">📱 Member app preview</Link>
+              <Link href="/login" className="block rounded-md px-3 py-2 text-sm font-medium text-neutral-500 hover:bg-neutral-50">🔒 Login screen</Link>
+            </div>
           </aside>
           <main className="flex-1 p-8">{children}</main>
         </div>

@@ -9,18 +9,18 @@
 
 ### CRM (Owner/Admin Web Dashboard)
 
-- ⬜ **Authentication:** magic link login, join-via-invite-code, logout, session guard.
+- ✅/⬜ **Authentication:** ✅ login screen (magic-link UI, mock in demo mode). ⬜ real Supabase auth, join-via-invite-code, logout, session guard (DEPLOY.md B1).
 - ✅/⬜ **Dashboard:** today's classes, attendance, active members, expiring memberships. ✅ **Live check-in feed (realtime)** and **at-risk member alert** already built. **[added: live feed + at-risk were missing from draft]**
 - ✅/⬜ **Member Management:** ✅ list/search/create/deactivate. ⬜ profile editing, emergency contacts, DOB, medical notes, boxing fields (weight class, skill level, fight record), coach notes, waiver upload, bulk QR card print sheet, **archive = soft-delete only (never hard delete)** **[added]**, **bulk actions** **[added]**, **trial role (walk-in, no booking)** **[added]**.
 - ✅/⬜ **Attendance Analytics ("Logs" — core must-have):** ✅ busiest days, per-member trends/streaks, drop-off detection, revenue-at-risk number. ⬜ per-class attendance view. **[added — entire section was missing from draft]**
-- ⬜ **Class Scheduling:** schedule grid, create/edit/delete, recurring days, capacity limits, coach assignment, class colors, cancel-session flow **+ auto-notification to booked members on cancellation** **[added]**.
-- ⬜ **Booking Management:** per-session rosters, waitlist automation, spots remaining, late-cancel marking, no-show logging, **no-show fees — automated penalty logic for booked members who don't attend (logs.md — needs G1 decision on whether they charge them at all)** **[added]**, **`attended` reconciliation when a booked member checks in** **[added]**.
-- ⬜ **Coach Management:** add/remove staff, profiles (photo/bio/experience), role permissions (owner/manager/coach/receptionist), coach scheduling, **coach invite flow (email → role)** **[added]**.
-- ⬜ **Membership Plans:** monthly, annual, drop-in, punch-card, family, trial, intro-offer; assign/freeze/renew/expire.
-- ✅/⬜ **Manual Payments:** ✅ payment status per member. ⬜ record payments (cash/e-transfer/card), invoice history, daily "mark payments received" flow.
+- ✅/⬜ **Class Scheduling:** ✅ weekly schedule grid, create class, recurring days, capacity limits, coach assignment, class colors, deactivate class, cancel-session flow. ⬜ edit existing class, **auto-notification to booked members on cancellation** **[added]**.
+- ✅/⬜ **Booking Management:** ✅ per-session rosters, waitlist (auto-waitlist when full + promote), spots remaining, cancel/no-show/attended marking, book member from CRM. ⬜ **no-show fees — automated penalty logic (needs G1 decision)** **[added]**, **automatic `attended` reconciliation when a booked member checks in** **[added]**.
+- ✅/⬜ **Coach Management:** ✅ staff list, promote member to coach, remove coach role, role badges. ⬜ profiles (photo/bio/experience), coach scheduling, **coach invite flow (email → role)** **[added]**.
+- ✅/⬜ **Membership Plans:** ✅ all plan kinds (monthly/annual/drop-in/punch-card/family/trial/intro-offer), create + activate/deactivate. ⬜ assign/freeze/renew/expire per member.
+- ✅/⬜ **Manual Payments:** ✅ payment status per member, record payments (cash/e-transfer/card), payment history, daily + monthly totals, recording marks membership paid. ⬜ printable invoices.
 - ✅/⬜ **Communication:** ✅ announcements with types (closure/fight/event), pinning, read counts, reactions. ⬜ image uploads (+compression), **announcement expiry/auto-archive** **[added]**, **email blast to members** **[added]**, deactivation notification (member is told their QR stopped working — never surprised at the door).
-- ⬜ **Settings & Customization:** gym logo, business info, operating hours, cancellation policies, kiosk management (QR rotation + kiosk JWT minting), **feature flags per gym** **[added]**.
-- ⬜ **Reports:** revenue, popular classes, coach attendance, renewals, member counts, CSV exports, **birthday reminders (Amir nice-to-have)** **[added]**.
+- ✅/⬜ **Settings & Customization:** ✅ business info, operating hours, cancellation policy. ⬜ gym logo upload, kiosk management (QR rotation + kiosk JWT minting — D-01), **feature flags per gym** **[added]**.
+- ✅/⬜ **Reports:** ✅ revenue by month + by method, popular classes, member counts, at-risk count, attendance leaderboard, payments CSV export. ⬜ coach attendance, renewals report, **birthday reminders (Amir nice-to-have)** **[added]**.
 - ✅/⬜ **Operational Back-ups:** ✅ manual check-in override. ⬜ Type-B CSV import wizard, Law 25 tools (data download, PII anonymization).
 
 ### QR Check-In System (the #1 must-have — its own section) **[added: draft had only the kiosk screen]**
@@ -30,11 +30,13 @@
 
 ### Member App & Kiosk (Mobile/Tablet)
 
-- ⬜ **Splash & Login:** doors-opening owner-photo splash, welcome flow, email OTP login.
-- ⬜ **Home:** today's classes, upcoming bookings, membership status, announcements feed with reactions.
-- ⬜ **Class Schedule:** browse, filter by coach/type, spots left, book/cancel/waitlist.
-- ⬜ **My QR:** full-screen check-in code.
-- ⬜ **Profile:** membership status, renewal date, attendance history, emergency contact.
+> ✅ **Web preview of the member app is live at `/app`** (phone-framed, real shared data, doors splash, booking works). The real Expo app remains ⬜ — statuses below track the real app.
+
+- ⬜ **Splash & Login:** doors-opening owner-photo splash *(preview ✅)*, welcome flow, email OTP login.
+- ⬜ **Home:** today's classes, upcoming bookings, membership status, announcements feed *(preview ✅)*.
+- ⬜ **Class Schedule:** browse, spots left, book/waitlist *(preview ✅)*; filter by coach/type, cancel booking.
+- ⬜ **My QR:** full-screen check-in code *(preview ✅)*.
+- ⬜ **Profile:** membership status, renewal date, attendance history *(preview ✅)*; emergency contact.
 - ⬜ **Staff Directory:** coach profiles.
 - ⬜ **Kiosk Screen:** locked tablet camera view, dynamic states ("Welcome, Marco ✓" / "Membership inactive ✗").
 - ⬜ **Push Notifications:** booking confirmed, class cancelled, waitlist opened, announcements — **+ in-app notification feed as fallback when push fails** **[added]**, **push opt-out handled gracefully** **[added]**, **offline mode: cached schedule + graceful errors** **[added]**.
@@ -47,7 +49,7 @@
 
 ## Phase 2 — Growth & Retention
 
-- ⬜ Lead/Trial Kanban pipeline (New → Contacted → Trial → Converted/Lost), activity logs, follow-up reminders, **lead source tracking incl. TikTok/FB + who-captured attribution** **[added]**.
+- ✅/⬜ Lead/Trial Kanban pipeline: ✅ full board (New → Contacted → Trial booked → Trialing → Converted/Lost), add lead, move stages, source tracking incl. TikTok/FB, overdue follow-up flags. ⬜ activity logs, follow-up reminders (notifications), who-captured attribution.
 - ⬜ Digital waivers (e-signature + storage).
 - ⬜ Automated drip campaigns (SMS/email trial nurture, "we miss you" retention).
 - ⬜ In-app payments (member self-service, Stripe) — **blocked by D-16 margin-model decision** **[added]**.

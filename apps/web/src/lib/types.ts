@@ -57,3 +57,95 @@ export interface MemberAttendanceSummary {
   totalVisits: number;
   lastVisit: string | null;
 }
+
+// ---- Phase-1 build-out types (mirror schema tables) ----
+
+export type PlanKind = "recurring" | "drop_in" | "punch_card" | "family" | "trial" | "intro_offer";
+
+export interface MembershipPlan {
+  id: string;
+  gym_id: string;
+  name: string;
+  kind: PlanKind;
+  price_cents: number | null;
+  billing_period: "monthly" | "quarterly" | "annual" | null;
+  max_classes: number | null;
+  is_active: boolean;
+}
+
+export interface GymClass {
+  id: string;
+  gym_id: string;
+  name: string;
+  description: string | null;
+  coach_id: string | null;
+  day_of_week: number[]; // 0=Sun … 6=Sat
+  start_time: string; // "18:00"
+  duration_mins: number;
+  capacity: number | null;
+  location: string | null;
+  color: string | null; // badge color key: "red" | "blue" | "green" | "yellow" | "purple"
+  is_active: boolean;
+}
+
+export type SessionStatus = "scheduled" | "canceled" | "completed";
+
+export interface ClassSession {
+  id: string;
+  class_id: string;
+  class_name: string;
+  session_date: string; // "2026-07-03"
+  start_time: string;
+  duration_mins: number;
+  capacity: number | null;
+  coach_id: string | null;
+  coach_name: string;
+  status: SessionStatus;
+  color: string | null;
+}
+
+export type BookingStatus = "booked" | "canceled" | "waitlisted" | "attended" | "no_show";
+
+export interface ClassBooking {
+  id: string;
+  session_id: string;
+  gym_member_id: string;
+  member_name: string;
+  status: BookingStatus;
+  booked_at: string;
+}
+
+export interface Payment {
+  id: string;
+  gym_member_id: string;
+  member_name: string;
+  amount_cents: number;
+  method: "cash" | "etransfer" | "card" | "other";
+  paid_at: string; // date
+  notes: string | null;
+}
+
+export type LeadSource = "walk_in" | "referral" | "instagram" | "tiktok" | "facebook" | "youtube" | "website" | "fight_event" | "other";
+export type LeadStatus = "new" | "contacted" | "trial_scheduled" | "trialing" | "converted" | "lost";
+
+export interface Lead {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  source: LeadSource | null;
+  status: LeadStatus;
+  follow_up_date: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface GymSettings {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  hours: string;
+  cancellation_policy_hours: number;
+}

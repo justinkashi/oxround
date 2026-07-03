@@ -3,8 +3,15 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Announcement, CheckIn, GymMember, MemberAttendanceSummary, Membership, PaymentStatus } from "./types";
-import { demoAnnouncements, demoCheckIns, demoMembers, demoMemberships } from "./demo-data";
+import type {
+  Announcement, BookingStatus, CheckIn, ClassBooking, ClassSession, GymClass, GymMember,
+  GymSettings, Lead, LeadStatus, MemberAttendanceSummary, Membership, MembershipPlan,
+  Payment, PaymentStatus,
+} from "./types";
+import {
+  demoAnnouncements, demoBookings, demoCheckIns, demoClasses, demoLeads, demoMembers,
+  demoMemberships, demoPayments, demoPlans, demoSessions, demoSettings,
+} from "./demo-data";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -22,6 +29,13 @@ const state = {
   memberships: [...demoMemberships],
   checkIns: [...demoCheckIns],
   announcements: [...demoAnnouncements],
+  plans: [...demoPlans],
+  classes: [...demoClasses],
+  sessions: [...demoSessions],
+  bookings: [...demoBookings],
+  payments: [...demoPayments],
+  leads: [...demoLeads],
+  settings: { ...demoSettings },
 };
 
 export async function listMembers(): Promise<GymMember[]> {
@@ -188,4 +202,276 @@ export async function createAnnouncement(input: { title: string; body: string; t
   }
   const { error } = await supabase().from("announcements").insert(input);
   if (error) throw error;
+}
+
+// ============ MEMBERSHIP PLANS ============
+
+export async function listPlans(): Promise<MembershipPlan[]> {
+  if (isDemoMode) return state.plans;
+  const { data, error } = await supabase().from("membership_plans").select("*").order("created_at");
+  if (error) throw error;
+  return data as MembershipPlan[];
+}
+
+export async function createPlan(input: Omit<MembershipPlan, "id" | "gym_id" | "is_active">): Promise<void> {
+  if (isDemoMode) {
+    state.plans.push({ ...input, id: `p${Date.now()}`, gym_id: "g1", is_active: true });
+    return;
+  }
+  const { error } = await supabase().from("membership_plans").insert(input);
+  if (error) throw error;
+}
+
+export async function setPlanActive(planId: string, isActive: boolean): Promise<void> {
+  if (isDemoMode) {
+    const p = state.plans.find((x) => x.id === planId);
+    if (p) p.is_active = isActive;
+    return;
+  }
+  await supabase().from("membership_plans").update({ is_active: isActive }).eq("id", planId);
+}
+
+// ============ CLASSES & SESSIONS ============
+
+export async function listClasses(): Promise<GymClass[]> {
+  if (isDemoMode) return state.classes.filter((c) => c.is_active);
+  const { data, error } = await supabase().from("classes").select("*").eq("is_active", true).order("start_time");
+  if (error) throw error;
+  return data as GymClass[];
+}
+
+export async function createClass(input: Omit<GymClass, "id" | "gym_id" | "is_active">): Promise<void> {
+  if (isDemoMode) {
+    const cl: GymClass = { ...input, id: `cl${Date.now()}`, gym_id: "g1", is_active: true };
+    state.classes.push(cl);
+    // regenerate demo sessions for the next 14 days for this class
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const coach = state.members.find((m) => m.id === cl.coach_id);
+    for (let d = 0; d < 14; d++) {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + d);
+      if (!cl.day_of_week.includes(day.getDay())) continue;
+      state.sessions.push({
+        id: `ses${Date.now()}-${d}`, class_id: cl.id, class_name: cl.name,
+        session_date: day.toISOString().slice(0, 10), start_time: cl.start_time,
+        duration_mins: cl.duration_mins, capacity: cl.capacity, coach_id: cl.coach_id,
+        coach_name: coach ? `${coach.first_name} ${coach.last_name ?? ""}`.trim() : "—",
+        status: "scheduled", color: cl.color,
+      });
+    }
+    state.sessions.sort((a, b) => a.session_date.localeCompare(b.session_date) || a.start_time.localeCompare(b.start_time));
+    return;
+  }
+  const { error } = await supabase().from("classes").insert(input);
+  if (error) throw error;
+}
+
+export async function deactivateClass(classId: string): Promise<void> {
+  if (isDemoMode) {
+    const c = state.classes.find((x) => x.id === classId);
+    if (c) c.is_active = false;
+    state.sessions = state.sessions.filter((s) => s.class_id !== classId || s.session_date < new Date().toISOString().slice(0, 10));
+    return;
+  }
+  await supabase().from("classes").update({ is_active: false }).eq("id", classId);
+}
+
+export async function listSessions(fromISO: string, toISO: string): Promise<ClassSession[]> {
+  if (isDemoMode) return state.sessions.filter((s) => s.session_date >= fromISO && s.session_date <= toISO);
+  const { data, error } = await supabase()
+    .from("class_sessions")
+    .select("*, classes(name, color), gym_members(first_name, last_name)")
+    .gte("session_date", fromISO)
+    .lte("session_date", toISO)
+    .order("session_date")
+    .order("start_time");
+  if (error) throw error;
+  return (data as unknown as Array<Record<string, unknown> & { classes: { name: string; color: string | null }; gym_members: { first_name: string; last_name: string | null } | null }>).map((r) => ({
+    id: r.id as string, class_id: r.class_id as string, class_name: r.classes.name,
+    session_date: r.session_date as string, start_time: r.start_time as string,
+    duration_mins: r.duration_mins as number, capacity: r.capacity as number | null,
+    coach_id: r.coach_id as string | null,
+    coach_name: r.gym_members ? `${r.gym_members.first_name} ${r.gym_members.last_name ?? ""}`.trim() : "—",
+    status: r.status as ClassSession["status"], color: r.classes.color,
+  }));
+}
+
+export async function getSession(sessionId: string): Promise<ClassSession | null> {
+  if (isDemoMode) return state.sessions.find((s) => s.id === sessionId) ?? null;
+  const all = await listSessions("1970-01-01", "2999-12-31");
+  return all.find((s) => s.id === sessionId) ?? null;
+}
+
+export async function cancelSession(sessionId: string): Promise<void> {
+  if (isDemoMode) {
+    const s = state.sessions.find((x) => x.id === sessionId);
+    if (s) s.status = "canceled";
+    return;
+  }
+  await supabase().from("class_sessions").update({ status: "canceled" }).eq("id", sessionId);
+}
+
+// ============ BOOKINGS ============
+
+export async function sessionBookings(sessionId: string): Promise<ClassBooking[]> {
+  if (isDemoMode) return state.bookings.filter((b) => b.session_id === sessionId && b.status !== "canceled");
+  const { data, error } = await supabase()
+    .from("class_bookings")
+    .select("*, gym_members(first_name, last_name)")
+    .eq("session_id", sessionId)
+    .neq("status", "canceled");
+  if (error) throw error;
+  return (data as unknown as Array<Record<string, unknown> & { gym_members: { first_name: string; last_name: string | null } }>).map((r) => ({
+    id: r.id as string, session_id: r.session_id as string, gym_member_id: r.gym_member_id as string,
+    member_name: `${r.gym_members.first_name} ${r.gym_members.last_name ?? ""}`.trim(),
+    status: r.status as BookingStatus, booked_at: r.booked_at as string,
+  }));
+}
+
+export async function bookingCounts(sessionIds: string[]): Promise<Record<string, { booked: number; waitlisted: number }>> {
+  const out: Record<string, { booked: number; waitlisted: number }> = {};
+  for (const id of sessionIds) out[id] = { booked: 0, waitlisted: 0 };
+  const rows = isDemoMode
+    ? state.bookings.filter((b) => sessionIds.includes(b.session_id))
+    : ((await supabase().from("class_bookings").select("session_id, status").in("session_id", sessionIds)).data as Array<{ session_id: string; status: BookingStatus }> | null) ?? [];
+  for (const b of rows) {
+    if (!out[b.session_id]) continue;
+    if (b.status === "booked" || b.status === "attended") out[b.session_id].booked++;
+    if (b.status === "waitlisted") out[b.session_id].waitlisted++;
+  }
+  return out;
+}
+
+export async function addBooking(sessionId: string, memberId: string): Promise<void> {
+  const session = await getSession(sessionId);
+  const existing = await sessionBookings(sessionId);
+  const full = session?.capacity != null && existing.filter((b) => b.status === "booked" || b.status === "attended").length >= session.capacity;
+  const status: BookingStatus = full ? "waitlisted" : "booked";
+  if (isDemoMode) {
+    const m = state.members.find((x) => x.id === memberId);
+    if (!m || existing.some((b) => b.gym_member_id === memberId)) return;
+    state.bookings.push({
+      id: `b${Date.now()}`, session_id: sessionId, gym_member_id: memberId,
+      member_name: `${m.first_name} ${m.last_name ?? ""}`.trim(), status, booked_at: new Date().toISOString(),
+    });
+    return;
+  }
+  await supabase().from("class_bookings").insert({ session_id: sessionId, gym_member_id: memberId, status });
+}
+
+export async function setBookingStatus(bookingId: string, status: BookingStatus): Promise<void> {
+  if (isDemoMode) {
+    const b = state.bookings.find((x) => x.id === bookingId);
+    if (b) b.status = status;
+    return;
+  }
+  await supabase().from("class_bookings").update({ status }).eq("id", bookingId);
+}
+
+// ============ COACHES ============
+
+export async function listCoaches(): Promise<GymMember[]> {
+  if (isDemoMode) return state.members.filter((m) => m.status === "active" && (m.roles.includes("coach") || m.roles.includes("owner") || m.roles.includes("manager")));
+  const { data, error } = await supabase().from("gym_members").select("*").eq("status", "active").overlaps("roles", ["coach", "owner", "manager"]).order("first_name");
+  if (error) throw error;
+  return data as GymMember[];
+}
+
+export async function setMemberRoles(memberId: string, roles: GymMember["roles"]): Promise<void> {
+  if (isDemoMode) {
+    const m = state.members.find((x) => x.id === memberId);
+    if (m) m.roles = roles;
+    return;
+  }
+  await supabase().from("gym_members").update({ roles }).eq("id", memberId);
+}
+
+// ============ PAYMENTS ============
+
+export async function listPayments(): Promise<Payment[]> {
+  if (isDemoMode) return state.payments;
+  const { data, error } = await supabase()
+    .from("payments")
+    .select("*, gym_members(first_name, last_name)")
+    .order("paid_at", { ascending: false });
+  if (error) throw error;
+  return (data as unknown as Array<Record<string, unknown> & { gym_members: { first_name: string; last_name: string | null } }>).map((r) => ({
+    id: r.id as string, gym_member_id: r.gym_member_id as string,
+    member_name: `${r.gym_members.first_name} ${r.gym_members.last_name ?? ""}`.trim(),
+    amount_cents: r.amount_cents as number, method: r.method as Payment["method"],
+    paid_at: r.paid_at as string, notes: (r.notes as string | null) ?? null,
+  }));
+}
+
+export async function recordPayment(input: { gym_member_id: string; amount_cents: number; method: Payment["method"]; notes: string | null }): Promise<void> {
+  if (isDemoMode) {
+    const m = state.members.find((x) => x.id === input.gym_member_id);
+    state.payments.unshift({
+      id: `pay${Date.now()}`, ...input,
+      member_name: m ? `${m.first_name} ${m.last_name ?? ""}`.trim() : "—",
+      paid_at: new Date().toISOString().slice(0, 10),
+    });
+    // recording a payment marks the active membership paid
+    const s = state.memberships.find((x) => x.gym_member_id === input.gym_member_id);
+    if (s) s.payment_status = "paid";
+    return;
+  }
+  const { error } = await supabase().from("payments").insert(input);
+  if (error) throw error;
+  await supabase().from("memberships").update({ payment_status: "paid" }).eq("gym_member_id", input.gym_member_id).eq("status", "active");
+}
+
+// ============ LEADS ============
+
+export async function listLeads(): Promise<Lead[]> {
+  if (isDemoMode) return state.leads;
+  const { data, error } = await supabase().from("leads").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as Lead[];
+}
+
+export async function createLead(input: { first_name: string; last_name: string; email: string; phone: string; source: Lead["source"]; notes: string }): Promise<void> {
+  if (isDemoMode) {
+    state.leads.unshift({
+      id: `l${Date.now()}`, first_name: input.first_name, last_name: input.last_name || null,
+      email: input.email || null, phone: input.phone || null, source: input.source,
+      status: "new", follow_up_date: null, notes: input.notes || null, created_at: new Date().toISOString(),
+    });
+    return;
+  }
+  const { error } = await supabase().from("leads").insert(input);
+  if (error) throw error;
+}
+
+export async function setLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
+  if (isDemoMode) {
+    const l = state.leads.find((x) => x.id === leadId);
+    if (l) l.status = status;
+    return;
+  }
+  await supabase().from("leads").update({ status }).eq("id", leadId);
+}
+
+// ============ SETTINGS ============
+
+export async function getSettings(): Promise<GymSettings> {
+  if (isDemoMode) return state.settings;
+  const { data, error } = await supabase().from("gyms").select("*").single();
+  if (error) throw error;
+  const g = data as Record<string, unknown>;
+  return {
+    name: (g.name as string) ?? "", address: (g.address as string) ?? "", phone: (g.phone as string) ?? "",
+    email: (g.email as string) ?? "", hours: (g.hours as string) ?? "",
+    cancellation_policy_hours: (g.cancellation_policy_hours as number) ?? 12,
+  };
+}
+
+export async function saveSettings(s: GymSettings): Promise<void> {
+  if (isDemoMode) {
+    state.settings = { ...s };
+    return;
+  }
+  await supabase().from("gyms").update(s).neq("id", "");
 }
