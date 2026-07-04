@@ -9,12 +9,11 @@
 
 > **Update this block + flip ✅/⬜ marks in FEATURES.md after every work session. Nothing else needs updating.**
 
-- **Phase:** demo build-out COMPLETE (pre-deployment, $0). Nothing is deployed — no Supabase project, no Vercel.
-- **Built:** full clickable CRM at `localhost:3000` — dashboard/live feed/at-risk, members, classes (weekly grid + rosters + waitlist), attendance analytics, payments, plans, leads Kanban, coaches, announcements, reports (+CSV), settings, login screen (mock) — plus phone-framed member-app preview at `/app` (doors splash, booking, QR). All demo-mode, in-memory data.
-- **Decided sequence (2026-07-03):** 1) ✅ demo screens → 2) set up FREE-tier Supabase (ca-central-1) + FREE Vercel → 3) deploy. Free-tier caveats: Supabase free pauses after 7 days of inactivity + no backups; Vercel Hobby is non-commercial only — must move to Pro when G1 starts paying.
-- **Next:** DEPLOY.md free-tier protocol in progress (user driving: Supabase + Vercel accounts created 2026-07-03). Deploying in demo mode first (no env vars = live shareable demo); real auth (B1) is the code work that gates real data.
-- **Fixed 2026-07-03:** lockfile synced to Next 16; `typescript` pinned to a real version (^5.9.3). `pnpm install` once and you're current.
-- **Last updated:** 2026-07-03 (demo build-out: 11 new screens; docs reorganized — root = README/FEATURES/DEPLOY/CLAUDE, rest in `docs/`).
+- **Phase:** DEPLOYED (free tier, demo mode). Live at the Vercel URL; Supabase project `oxround` in ca-central-1 with all 3 migrations, token hook, buckets, email provider configured. No env vars on Vercel yet — site intentionally runs demo mode until real auth exists.
+- **Built:** full clickable CRM (dashboard/live feed/at-risk, members, classes grid + rosters + waitlist, attendance, payments, plans, leads Kanban, coaches, announcements, reports+CSV, settings, mock login) + member-app preview at `/app` + responsive pass (mobile nav, stacking layouts, scrollable tables — desktop unchanged).
+- **DEPLOY.md status:** Steps 1–3 ✅, 4.5 (2FA) ✅, 5.1 (real auth CODE) ✅ built & verified — magic-link login, session guard (`apps/web/src/proxy.ts`), logout, `/auth/callback`, owner bootstrap SQL at `supabase/bootstrap-owner.sql`. Pending: 4.0 domain purchase (Resend prerequisite), 5.2–5.8 (config + owner onboarding).
+- **Next:** push auth code → Supabase URL config (5.2) → Vercel env vars (5.3) → test login with own email → domain + Resend (5.4) → invite G1 owner.
+- **Last updated:** 2026-07-04 (real auth built; deployed + responsive earlier same day).
 
 **The direction in one sentence:** finish making both products fully clickable on your laptop for free, use that to win G1, then pay to put it online.
 
@@ -60,3 +59,13 @@
 pnpm install   # once
 pnpm dev       # then open localhost:3000
 ```
+
+## How to ship changes
+
+| What changed | Command(s) |
+|---|---|
+| App code (anything in `apps/`) | `git add -A && git commit -m "…" && git push` — Vercel auto-deploys in ~2 min |
+| New file in `supabase/migrations/` | `supabase db push`, then the git commands |
+| Files in `supabase/functions/` | `supabase functions deploy <name>`, then the git commands |
+
+Unsure? `git status` — changes under `supabase/` need a supabase command; everything else is git-only.

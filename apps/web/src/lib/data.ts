@@ -2,7 +2,8 @@
 // in-memory demo dataset (mutations persist for the browser session — enough for the G1 demo).
 "use client";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Announcement, BookingStatus, CheckIn, ClassBooking, ClassSession, GymClass, GymMember,
   GymSettings, Lead, LeadStatus, MemberAttendanceSummary, Membership, MembershipPlan,
@@ -17,9 +18,10 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const isDemoMode = !url || !anon;
 
+// Cookie-based client (@supabase/ssr) so the middleware route guard sees the session.
 let sb: SupabaseClient | null = null;
 export function supabase(): SupabaseClient {
-  if (!sb) sb = createClient(url!, anon!);
+  if (!sb) sb = createBrowserClient(url!, anon!);
   return sb;
 }
 

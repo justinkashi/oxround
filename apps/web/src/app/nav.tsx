@@ -1,8 +1,11 @@
 "use client";
 // Responsive nav: desktop = fixed sidebar (unchanged look); mobile = top bar + hamburger.
+// Real mode: shows the signed-in email + logout. Demo mode: shows nothing extra.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { isDemoMode, supabase } from "@/lib/data";
 
 const nav = [
   { href: "/", label: "Dashboard" },
@@ -61,6 +64,33 @@ function Brand() {
   );
 }
 
+function UserBox() {
+  const [email, setEmail] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isDemoMode) return;
+    supabase().auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+  }, []);
+
+  if (isDemoMode || !email) return null;
+  return (
+    <div className="mt-6 border-t border-neutral-200 pt-3">
+      <div className="truncate px-3 text-xs text-neutral-500" title={email}>{email}</div>
+      <button
+        onClick={async () => {
+          await supabase().auth.signOut();
+          router.push("/login");
+          router.refresh();
+        }}
+        className="mt-1 block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-red-50 hover:text-brand"
+      >
+        Log out
+      </button>
+    </div>
+  );
+}
+
 export default function Nav() {
   const [open, setOpen] = useState(false);
 
@@ -70,6 +100,7 @@ export default function Nav() {
       <aside className="hidden w-56 shrink-0 border-r border-neutral-200 bg-white p-4 md:block">
         <div className="mb-8"><Brand /></div>
         <NavLinks />
+        <UserBox />
       </aside>
 
       {/* Mobile top bar */}
@@ -87,6 +118,7 @@ export default function Nav() {
         {open && (
           <div className="border-t border-neutral-200 p-3">
             <NavLinks onNavigate={() => setOpen(false)} />
+            <UserBox />
           </div>
         )}
       </div>

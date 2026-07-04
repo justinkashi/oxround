@@ -12,28 +12,28 @@ Known free-tier limits (accepted): Supabase pauses after **7 days of no database
 
 ### Step 1 — GitHub (once)
 
-- [ ] 1.1 Repo pushed to GitHub as **private**. Verify no `.env*` file was ever committed (`.gitignore` already covers it): on github.com press `t` and type `.env` — nothing should appear.
+- [x] 1.1 Repo pushed to GitHub as **private**. Verify no `.env*` file was ever committed (`.gitignore` already covers it): on github.com press `t` and type `.env` — nothing should appear.
 
 ### Step 2 — Supabase project (~20 min, all in the dashboard + terminal)
 
-- [ ] 2.1 supabase.com → **New project**. Name: `oxround`. **Region: Canada Central (ca-central-1)** — non-negotiable, Law 25 (docs/STACK_REVIEW.md R5). Plan: Free. Generate a strong database password and save it in your password manager — you'll need it in 2.3.
-- [ ] 2.2 Install the Supabase CLI on your Mac: `brew install supabase/tap/supabase` (or without Homebrew: `npm i -g supabase`). Then `supabase login` — opens your browser.
-- [ ] 2.3 In your terminal, at the repo root: `supabase link --project-ref <REF>` — the REF is the 20-character code in your project's URL (`supabase.com/dashboard/project/<REF>`). It asks for the database password from 2.1.
-- [ ] 2.4 `supabase db push` — applies all three migrations (schema + RLS + token hook). **Never run `seed.sql` on this project** — it contains demo check-in tokens.
-- [ ] 2.5 `supabase functions deploy check-in` — deploys the check-in Edge Function. (The `auth-hook` Edge Function is superseded by migration 0003's Postgres function — faster, no webhook secret. Don't deploy it; the folder stays in the repo as history.)
-- [ ] 2.6 Dashboard → **Authentication → Hooks** → **Customize Access Token (JWT) Claims** → Hook type: **Postgres** → schema `public`, function `custom_access_token_hook` → Create hook. ⚠️ Skipping this breaks everything silently: it's what puts `gym_id` + roles into the login token, and every RLS rule depends on it.
-- [ ] 2.7 Dashboard → **Storage** → create bucket `announcements` (toggle **Public** ON) and bucket `waivers` (Public OFF).
-- [ ] 2.8 Dashboard → **Authentication → Sign In / Providers** → Email: ON. Also turn **"Allow new users to sign up" OFF** (invite-only until the member app ships). ⚠️ The built-in email sender is 2 emails/hour AND only delivers to your own Supabase team's addresses — the G1 owner would never receive a login email. Custom SMTP (step 5.4) is therefore REQUIRED before anyone but you logs in.
-- [ ] 2.9 Dashboard → **Settings → API Keys**: copy the **Project URL** and the public key — the project has two interchangeable formats: legacy `anon` and modern `sb_publishable_…` (prefer the modern one). These are the two values Vercel will need later (safe to expose in a browser — the secret ones are `service_role` / `sb_secret_…`, never copy those anywhere).
-- [ ] 2.10 Pause prevention: put a weekly reminder in your phone to open the CRM (any real page-load of live data counts), or accept manually unpausing after idle weeks.
+- [x] 2.1 supabase.com → **New project**. Name: `oxround`. **Region: Canada Central (ca-central-1)** — non-negotiable, Law 25 (docs/STACK_REVIEW.md R5). Plan: Free. Generate a strong database password and save it in your password manager — you'll need it in 2.3.
+- [x] 2.2 Install the Supabase CLI on your Mac: `brew install supabase/tap/supabase` (or without Homebrew: `npm i -g supabase`). Then `supabase login` — opens your browser.
+- [x] 2.3 In your terminal, at the repo root: `supabase link --project-ref <REF>` — the REF is the 20-character code in your project's URL (`supabase.com/dashboard/project/<REF>`). It asks for the database password from 2.1.
+- [x] 2.4 `supabase db push` — applies all three migrations (schema + RLS + token hook). **Never run `seed.sql` on this project** — it contains demo check-in tokens.
+- [x] 2.5 `supabase functions deploy check-in` — deploys the check-in Edge Function. (The `auth-hook` Edge Function is superseded by migration 0003's Postgres function — faster, no webhook secret. Don't deploy it; the folder stays in the repo as history.)
+- [x] 2.6 Dashboard → **Authentication → Hooks** → **Customize Access Token (JWT) Claims** → Hook type: **Postgres** → schema `public`, function `custom_access_token_hook` → Create hook. ⚠️ Skipping this breaks everything silently: it's what puts `gym_id` + roles into the login token, and every RLS rule depends on it.
+- [x] 2.7 Dashboard → **Storage** → create bucket `announcements` (toggle **Public** ON) and bucket `waivers` (Public OFF).
+- [x] 2.8 Dashboard → **Authentication → Sign In / Providers** → Email: ON. Also turn **"Allow new users to sign up" OFF** (invite-only until the member app ships). ⚠️ The built-in email sender is 2 emails/hour AND only delivers to your own Supabase team's addresses — the G1 owner would never receive a login email. Custom SMTP (step 5.4) is therefore REQUIRED before anyone but you logs in.
+- [x] 2.9 Dashboard → **Settings → API Keys**: copy the **Project URL** and the public key — the project has two interchangeable formats: legacy `anon` and modern `sb_publishable_…` (prefer the modern one). These are the two values Vercel will need later (safe to expose in a browser — the secret ones are `service_role` / `sb_secret_…`, never copy those anywhere).
+- [x] 2.10 Pause prevention: put a weekly reminder in your phone to open the CRM (any real page-load of live data counts), or accept manually unpausing after idle weeks.
 
 ### Step 3 — Vercel (~10 min)
 
-- [ ] 3.1 vercel.com → **Add New… → Project** → Import the `oxround` GitHub repo.
-- [ ] 3.2 **Root Directory: `apps/web`** (it's a monorepo — this points Vercel at the Next.js app; it still auto-detects pnpm from the root lockfile). Framework preset: Next.js (auto). Leave build settings default.
-- [ ] 3.3 **Environment variables: add NONE for now.** No Supabase keys ⇒ the site runs in demo mode ⇒ you get a live, clickable, fake-data demo at a shareable URL. This is intentional: with the keys set, every page would show empty tables because the real login (Step 5) isn't built yet.
-- [ ] 3.4 Click **Deploy**. First build takes 2–3 min. You get `https://oxround-….vercel.app`.
-- [ ] 3.5 Smoke test the URL on your phone: dashboard, members, classes grid, a session roster, `/app` preview with the doors splash.
+- [x] 3.1 vercel.com → **Add New… → Project** → Import the `oxround` GitHub repo.
+- [x] 3.2 **Root Directory: `apps/web`** (it's a monorepo — this points Vercel at the Next.js app; it still auto-detects pnpm from the root lockfile). Framework preset: Next.js (auto). Leave build settings default.
+- [x] 3.3 **Environment variables: add NONE for now.** No Supabase keys ⇒ the site runs in demo mode ⇒ you get a live, clickable, fake-data demo at a shareable URL. This is intentional: with the keys set, every page would show empty tables because the real login (Step 5) isn't built yet.
+- [x] 3.4 Click **Deploy**. First build takes 2–3 min. You get `https://oxround-….vercel.app`.
+- [x] 3.5 Smoke test the URL on your phone: dashboard, members, classes grid, a session roster, `/app` preview with the doors splash.
 
 **🎉 Milestone: a shareable live demo.** Every `git push` to main now auto-deploys.
 
@@ -44,17 +44,17 @@ Known free-tier limits (accepted): Supabase pauses after **7 days of no database
 
 ### Step 4.5 — Account security (10 min, do anytime before real data)
 
-- [ ] 4.5.1 Turn on two-factor authentication (2FA) on all three accounts: GitHub, Supabase, Vercel. These three accounts ARE the company — anyone who gets into one can take the product, the database, or the deployment.
+- [x] 4.5.1 Turn on two-factor authentication (2FA) on all three accounts: GitHub, Supabase, Vercel. These three accounts ARE the company — anyone who gets into one can take the product, the database, or the deployment.
 
 ### Step 5 — Real auth = the go-live gate (the remaining CODE work, ~3–5 days)
 
 Everything above ships a demo. Real G1 data requires:
 
-- [ ] 5.1 Build B1 (below): magic-link login with `@supabase/ssr`, session guard on all pages, logout. The mock login page at `/login` is the UI starting point.
+- [x] 5.1 Build B1 (below): magic-link login with `@supabase/ssr`, session guard on all pages, logout. The mock login page at `/login` is the UI starting point.
 - [ ] 5.2 **Auth URL config (classic gotcha):** Supabase → Authentication → URL Configuration → set **Site URL** to your Vercel URL (later `app.oxround.com`) and add `http://localhost:3000/**` to **Redirect URLs**. Skip this and every magic-link email redirects to localhost — logins mysteriously fail for anyone but you.
 - [ ] 5.3 Only then: add `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel → Settings → Environment Variables (Production + Preview) → Redeploy.
 - [ ] 5.4 **Custom SMTP (required — default sender won't email the owner):** create a free Resend account (100 emails/day) → verify your sending domain (oxround.com) → Supabase → Authentication → Emails → SMTP Settings → enter Resend's SMTP credentials. Then raise the email rate limit (Authentication → Rate Limits) to something sane like 30/hr.
-- [ ] 5.5 Invite the G1 owner: Supabase → Authentication → Users → Invite user (his email). Then create the G1 gym row + his `gym_members` row with `roles={owner}` (prod-safe SQL, no seed.sql).
+- [ ] 5.5 Invite the G1 owner: Supabase → Authentication → Users → Invite user (his email). Then create the G1 gym row + his `gym_members` row with `roles={owner}` (prod-safe SQL: run `supabase/bootstrap-owner.sql` in the SQL editor — replace the email/name placeholders).
 - [ ] 5.6 Verify AS HIM from the app (not the SQL editor): log in → add member → print QR → record payment → post announcement.
 - [ ] 5.7 Law 25 minimum before real member data: privacy policy page linked in the footer + named privacy officer (you) + **sign the Supabase DPA** (Dashboard → Organization → Legal Documents — self-serve).
 - [ ] 5.8 Free tier has NO backups. The moment real data exists, take a weekly manual backup: `supabase db dump -f backup-$(date +%F).sql` (keep the files somewhere outside the repo). ⚠️ This command needs Docker Desktop installed and running (it dumps via a container) — install it then, or ask Claude for a Docker-free alternative. Stops being needed at the Supabase Pro upgrade.

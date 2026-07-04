@@ -9,7 +9,7 @@
 
 ### CRM (Owner/Admin Web Dashboard)
 
-- ✅/⬜ **Authentication:** ✅ login screen (magic-link UI, mock in demo mode). ⬜ real Supabase auth, join-via-invite-code, logout, session guard (DEPLOY.md B1).
+- ✅/⬜ **Authentication:** ✅ real magic-link login (Supabase, PKCE, invite-only), session guard on all pages (proxy), logout, auth callback; demo mode keeps the mock. ⬜ join-via-invite-code (member app flow).
 - ✅/⬜ **Dashboard:** today's classes, attendance, active members, expiring memberships. ✅ **Live check-in feed (realtime)** and **at-risk member alert** already built. **[added: live feed + at-risk were missing from draft]**
 - ✅/⬜ **Member Management:** ✅ list/search/create/deactivate. ⬜ profile editing, emergency contacts, DOB, medical notes, boxing fields (weight class, skill level, fight record), coach notes, waiver upload, bulk QR card print sheet, **archive = soft-delete only (never hard delete)** **[added]**, **bulk actions** **[added]**, **trial role (walk-in, no booking)** **[added]**.
 - ✅/⬜ **Attendance Analytics ("Logs" — core must-have):** ✅ busiest days, per-member trends/streaks, drop-off detection, revenue-at-risk number. ⬜ per-class attendance view. **[added — entire section was missing from draft]**
