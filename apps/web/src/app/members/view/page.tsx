@@ -54,7 +54,7 @@ function MemberProfile() {
         </span>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <h2 className="mb-3 font-semibold">Membership</h2>
           <p className="mb-1 text-sm">Plan: <strong>{membership?.plan_name ?? "none"}</strong></p>

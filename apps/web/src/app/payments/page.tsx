@@ -38,7 +38,7 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Payments</h1>
         <div className="flex gap-6 text-sm">
           <div><span className="text-neutral-500">Today:</span> <span className="font-bold">{money(todayTotal)}</span></div>
@@ -46,7 +46,7 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <form onSubmit={submit} className="mb-6 grid grid-cols-5 gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+      <form onSubmit={submit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2 md:grid-cols-5">
         <select required value={form.gym_member_id} onChange={(e) => setForm({ ...form, gym_member_id: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
           <option value="">Member…</option>
           {members.map((m) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
@@ -59,8 +59,8 @@ export default function PaymentsPage() {
         <button type="submit" className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">Record payment</button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
             <tr><th className="px-4 py-2">Date</th><th className="px-4 py-2">Member</th><th className="px-4 py-2">Amount</th><th className="px-4 py-2">Method</th><th className="px-4 py-2">Note</th></tr>
           </thead>

@@ -23,8 +23,8 @@ Known free-tier limits (accepted): Supabase pauses after **7 days of no database
 - [ ] 2.5 `supabase functions deploy check-in` — deploys the check-in Edge Function. (The `auth-hook` Edge Function is superseded by migration 0003's Postgres function — faster, no webhook secret. Don't deploy it; the folder stays in the repo as history.)
 - [ ] 2.6 Dashboard → **Authentication → Hooks** → **Customize Access Token (JWT) Claims** → Hook type: **Postgres** → schema `public`, function `custom_access_token_hook` → Create hook. ⚠️ Skipping this breaks everything silently: it's what puts `gym_id` + roles into the login token, and every RLS rule depends on it.
 - [ ] 2.7 Dashboard → **Storage** → create bucket `announcements` (toggle **Public** ON) and bucket `waivers` (Public OFF).
-- [ ] 2.8 Dashboard → **Authentication → Sign In / Providers** → Email: ON. Note: the built-in email sender is rate-limited to a few emails/hour — fine while only the owner logs in; switch to Resend SMTP before members use email login.
-- [ ] 2.9 Dashboard → **Settings → API** (or **Settings → API Keys**): copy the **Project URL** and the **anon/public key** somewhere safe. These are the two values Vercel will need later (they're safe to expose in a browser — the secret one is `service_role`, never copy that anywhere).
+- [ ] 2.8 Dashboard → **Authentication → Sign In / Providers** → Email: ON. Also turn **"Allow new users to sign up" OFF** (invite-only until the member app ships). ⚠️ The built-in email sender is 2 emails/hour AND only delivers to your own Supabase team's addresses — the G1 owner would never receive a login email. Custom SMTP (step 5.4) is therefore REQUIRED before anyone but you logs in.
+- [ ] 2.9 Dashboard → **Settings → API Keys**: copy the **Project URL** and the public key — the project has two interchangeable formats: legacy `anon` and modern `sb_publishable_…` (prefer the modern one). These are the two values Vercel will need later (safe to expose in a browser — the secret ones are `service_role` / `sb_secret_…`, never copy those anywhere).
 - [ ] 2.10 Pause prevention: put a weekly reminder in your phone to open the CRM (any real page-load of live data counts), or accept manually unpausing after idle weeks.
 
 ### Step 3 — Vercel (~10 min)
@@ -37,19 +37,29 @@ Known free-tier limits (accepted): Supabase pauses after **7 days of no database
 
 **🎉 Milestone: a shareable live demo.** Every `git push` to main now auto-deploys.
 
-### Step 4 — Domain (optional now, 15 min when ready)
+### Step 4 — Domain (REQUIRED before Step 5.4 — Resend can only email real recipients from a domain you own and verify)
 
-- [ ] 4.1 Vercel project → Settings → Domains → add `app.oxround.com` → add the CNAME record it shows you at your domain registrar. SSL is automatic.
+- [ ] 4.0 Own `oxround.com` (or any domain). If not yet purchased: ~$15/yr at any registrar — the one unavoidable cost of this plan.
+- [ ] 4.1 Vercel project → Settings → Domains → add `app.oxround.com` → add the CNAME record it shows you at your domain registrar. SSL is automatic. (Cosmetic — can wait for a booked G1 meeting.)
+
+### Step 4.5 — Account security (10 min, do anytime before real data)
+
+- [ ] 4.5.1 Turn on two-factor authentication (2FA) on all three accounts: GitHub, Supabase, Vercel. These three accounts ARE the company — anyone who gets into one can take the product, the database, or the deployment.
 
 ### Step 5 — Real auth = the go-live gate (the remaining CODE work, ~3–5 days)
 
 Everything above ships a demo. Real G1 data requires:
 
 - [ ] 5.1 Build B1 (below): magic-link login with `@supabase/ssr`, session guard on all pages, logout. The mock login page at `/login` is the UI starting point.
-- [ ] 5.2 Only then: add `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel → Settings → Environment Variables (Production + Preview) → Redeploy.
-- [ ] 5.3 Invite the G1 owner: Supabase → Authentication → Users → Invite user (his email). Then create the G1 gym row + his `gym_members` row with `roles={owner}` (prod-safe SQL, no seed.sql).
-- [ ] 5.4 Verify AS HIM from the app (not the SQL editor): log in → add member → print QR → record payment → post announcement.
-- [ ] 5.5 Law 25 minimum before real member data: privacy policy page linked in the footer + named privacy officer (you).
+- [ ] 5.2 **Auth URL config (classic gotcha):** Supabase → Authentication → URL Configuration → set **Site URL** to your Vercel URL (later `app.oxround.com`) and add `http://localhost:3000/**` to **Redirect URLs**. Skip this and every magic-link email redirects to localhost — logins mysteriously fail for anyone but you.
+- [ ] 5.3 Only then: add `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel → Settings → Environment Variables (Production + Preview) → Redeploy.
+- [ ] 5.4 **Custom SMTP (required — default sender won't email the owner):** create a free Resend account (100 emails/day) → verify your sending domain (oxround.com) → Supabase → Authentication → Emails → SMTP Settings → enter Resend's SMTP credentials. Then raise the email rate limit (Authentication → Rate Limits) to something sane like 30/hr.
+- [ ] 5.5 Invite the G1 owner: Supabase → Authentication → Users → Invite user (his email). Then create the G1 gym row + his `gym_members` row with `roles={owner}` (prod-safe SQL, no seed.sql).
+- [ ] 5.6 Verify AS HIM from the app (not the SQL editor): log in → add member → print QR → record payment → post announcement.
+- [ ] 5.7 Law 25 minimum before real member data: privacy policy page linked in the footer + named privacy officer (you) + **sign the Supabase DPA** (Dashboard → Organization → Legal Documents — self-serve).
+- [ ] 5.8 Free tier has NO backups. The moment real data exists, take a weekly manual backup: `supabase db dump -f backup-$(date +%F).sql` (keep the files somewhere outside the repo). ⚠️ This command needs Docker Desktop installed and running (it dumps via a container) — install it then, or ask Claude for a Docker-free alternative. Stops being needed at the Supabase Pro upgrade.
+
+> Note for later: when announcement **image uploads** are built, the Storage buckets will need their own access policies (buckets don't inherit table RLS). Not needed while uploads are unbuilt.
 
 ### Upgrade triggers (when free stops being correct)
 

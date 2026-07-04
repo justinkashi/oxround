@@ -35,7 +35,7 @@ export default function Dashboard() {
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
-      <div className="mb-8 grid grid-cols-3 gap-4">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Stat label="Active members" value={memberCount} />
         <Stat label="Check-ins today" value={today.length} />
         <Stat label="At-risk members" value={atRisk.length} accent={atRisk.length > 0} />

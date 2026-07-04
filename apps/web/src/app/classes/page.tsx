@@ -67,9 +67,9 @@ export default function ClassesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Classes</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => setWeek(week - 1)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm">←</button>
           <span className="min-w-32 text-center text-sm font-medium">{week === 0 ? "This week" : week === 1 ? "Next week" : `Week of ${iso(monday)}`}</span>
           <button onClick={() => setWeek(week + 1)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm">→</button>
@@ -79,7 +79,7 @@ export default function ClassesPage() {
 
       {showForm && (
         <form onSubmit={submit} className="mb-6 space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <input required placeholder="Class name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
             <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
             <select value={form.coach_id} onChange={(e) => setForm({ ...form, coach_id: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
@@ -87,7 +87,7 @@ export default function ClassesPage() {
               {coaches.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <label className="text-sm">Start <input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5" /></label>
             <label className="text-sm">Minutes <input type="number" value={form.duration_mins} onChange={(e) => setForm({ ...form, duration_mins: Number(e.target.value) })} className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5" /></label>
             <label className="text-sm">Capacity <input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5" /></label>
@@ -98,7 +98,7 @@ export default function ClassesPage() {
               </select>
             </label>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {DAY_LABELS.map((label, i) => {
               const dow = (i + 1) % 7; // Mon=1 … Sun=0
               const on = form.days.includes(dow);
@@ -114,7 +114,7 @@ export default function ClassesPage() {
         </form>
       )}
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7">
         {days.map((d, i) => {
           const dayISO = iso(d);
           const daySessions = sessions.filter((s) => s.session_date === dayISO);
@@ -145,8 +145,8 @@ export default function ClassesPage() {
       </div>
 
       <h2 className="mb-3 mt-8 text-lg font-semibold">Class templates</h2>
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
             <tr><th className="px-4 py-2">Class</th><th className="px-4 py-2">Days</th><th className="px-4 py-2">Time</th><th className="px-4 py-2">Coach</th><th className="px-4 py-2">Capacity</th><th className="px-4 py-2"></th></tr>
           </thead>

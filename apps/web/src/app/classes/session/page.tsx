@@ -38,7 +38,7 @@ function SessionInner() {
   return (
     <div>
       <Link href="/classes" className="text-sm text-brand hover:underline">← Back to classes</Link>
-      <div className="mb-6 mt-2 flex items-start justify-between">
+      <div className="mb-6 mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{session.class_name}{session.status === "canceled" && <span className="ml-3 rounded bg-neutral-200 px-2 py-1 text-sm font-medium text-neutral-600">CANCELED</span>}</h1>
           <p className="text-sm text-neutral-500">{session.session_date} · {session.start_time.slice(0, 5)} · {session.duration_mins} min · Coach: {session.coach_name}
@@ -50,7 +50,7 @@ function SessionInner() {
         )}
       </div>
 
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <select value={addId} onChange={(e) => setAddId(e.target.value)} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
           <option value="">Add a member…</option>
           {addable.map((m) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
@@ -60,8 +60,8 @@ function SessionInner() {
         <span className="text-xs text-neutral-400">Full sessions auto-waitlist.</span>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
             <tr><th className="px-4 py-2">Member</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Booked</th><th className="px-4 py-2 text-right">Mark</th></tr>
           </thead>

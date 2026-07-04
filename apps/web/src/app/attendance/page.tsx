@@ -35,7 +35,7 @@ export default function AttendancePage() {
     <div>
       <h1 className="mb-6 text-2xl font-bold">Attendance</h1>
 
-      <div className="mb-8 grid grid-cols-3 gap-4">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <div className="text-3xl font-bold">{thisMonth}</div>
           <div className="text-sm text-neutral-500">
@@ -70,8 +70,8 @@ export default function AttendancePage() {
       </div>
 
       <h2 className="mb-3 font-semibold">Per-member summary</h2>
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
             <tr>
               <th className="px-4 py-2">Member</th>

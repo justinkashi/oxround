@@ -55,7 +55,7 @@ export default function LeadsPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={submit} className="mb-6 grid grid-cols-6 gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+        <form onSubmit={submit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2 md:grid-cols-6">
           <input required placeholder="First name" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
           <input placeholder="Last name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
           <input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
@@ -64,11 +64,11 @@ export default function LeadsPage() {
             {SOURCES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
           </select>
           <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white">Add</button>
-          <input placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-6 rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <input placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2 md:col-span-6" />
         </form>
       )}
 
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
         {COLUMNS.map((col) => {
           const items = leads.filter((l) => l.status === col.status);
           return (

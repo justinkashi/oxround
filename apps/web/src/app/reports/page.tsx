@@ -55,19 +55,19 @@ export default function ReportsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Reports</h1>
         <button onClick={exportCsv} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50">Export payments CSV</button>
       </div>
 
-      <div className="mb-6 grid grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Active members" value={String(activeMembers)} />
         <Stat label="Revenue this month" value={money(months.at(-1)?.[1] ?? 0)} />
         <Stat label="At-risk members" value={String(atRisk)} warn={atRisk > 0} />
         <Stat label="Total collected (all time)" value={money(payments.reduce((s, p) => s + p.amount_cents, 0))} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Revenue by month</h2>
           <div className="space-y-2">

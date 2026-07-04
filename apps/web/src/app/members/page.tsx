@@ -35,7 +35,7 @@ export default function MembersPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Members</h1>
         <button onClick={() => setShowForm(!showForm)} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
           + Add member
@@ -43,7 +43,7 @@ export default function MembersPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={submit} className="mb-6 grid grid-cols-5 gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+        <form onSubmit={submit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2 md:grid-cols-5">
           {(["first_name", "last_name", "email", "phone"] as const).map((f) => (
             <input
               key={f}
@@ -65,8 +65,8 @@ export default function MembersPage() {
         className="mb-4 w-full max-w-sm rounded-md border border-neutral-300 px-3 py-2 text-sm"
       />
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
             <tr>
               <th className="px-4 py-2">Name</th>

@@ -35,9 +35,9 @@ export default function CoachesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Coaches & Staff</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select value={promoteId} onChange={(e) => setPromoteId(e.target.value)} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
             <option value="">Promote a member…</option>
             {promotable.map((m) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
@@ -46,7 +46,7 @@ export default function CoachesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {coaches.map((c) => (
           <div key={c.id} className="rounded-lg border border-neutral-200 bg-white p-4">
             <div className="mb-1 flex items-center gap-3">
@@ -71,7 +71,7 @@ export default function CoachesPage() {
             </div>
           </div>
         ))}
-        {coaches.length === 0 && <div className="col-span-3 rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-400">No staff yet</div>}
+        {coaches.length === 0 && <div className="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-400 sm:col-span-2 lg:col-span-3">No staff yet</div>}
       </div>
       <p className="mt-4 text-xs text-neutral-400">Role permissions (owner / manager / coach / receptionist) are enforced server-side once deployed — this screen manages who holds which role.</p>
     </div>
