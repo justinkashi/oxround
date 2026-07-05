@@ -25,6 +25,41 @@ export function supabase(): SupabaseClient {
   return sb;
 }
 
+// ---- current user: roles + member identity (Step 6A/6C) ----
+
+function rolesFromToken(token: string | undefined): string[] {
+  if (!token) return [];
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(payload));
+    return Array.isArray(json.roles) ? json.roles : [];
+  } catch {
+    return [];
+  }
+}
+
+// Roles of the signed-in user. Demo mode = owner (so the CRM is fully visible).
+export async function getMyRoles(): Promise<string[]> {
+  if (isDemoMode) return ["owner"];
+  const { data: { session } } = await supabase().auth.getSession();
+  return rolesFromToken(session?.access_token);
+}
+
+export const STAFF_ROLES = ["owner", "manager", "coach", "receptionist"];
+export async function isStaffUser(): Promise<boolean> {
+  const r = await getMyRoles();
+  return r.some((x) => STAFF_ROLES.includes(x));
+}
+
+// The signed-in member's own gym_members row. Demo = Marco (m1).
+export async function getCurrentMember(): Promise<GymMember | null> {
+  if (isDemoMode) return state.members.find((m) => m.id === "m1") ?? null;
+  const { data: { user } } = await supabase().auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase().from("gym_members").select("*").eq("user_id", user.id).maybeSingle();
+  return (data as GymMember | null) ?? null;
+}
+
 // ---- session-mutable demo state ----
 const state = {
   members: [...demoMembers],
@@ -110,9 +145,16 @@ export async function createMember(input: { first_name: string; last_name: strin
     .select()
     .single();
   if (error) throw error;
+  const member = data as GymMember;
+  // D-24: new member starts UNPAID — a pending membership so their QR stays gated (D-20)
+  // until the owner records the first payment. (No plan_id yet; owner assigns on the plan.)
+  await supabase().from("memberships").insert({
+    gym_id: member.gym_id, gym_member_id: member.id,
+    status: "active", payment_status: "pending", start_date: new Date().toISOString().slice(0, 10),
+  });
   // Caller is responsible for showing/printing `raw` immediately — it is not retrievable later.
   (data as Record<string, unknown>).__raw_token = raw;
-  return data as GymMember;
+  return member;
 }
 
 export async function listCheckIns(limit = 20): Promise<CheckIn[]> {
@@ -184,6 +226,74 @@ export async function recordManualCheckIn(memberId: string): Promise<void> {
     return;
   }
   await supabase().from("check_ins").insert({ gym_id: m.gym_id, gym_member_id: memberId, method: "manual_staff" });
+}
+
+// Scanner check-in (Step 6D). Validates active + paid (D-20 gate) then records the visit.
+// Called by the CRM scanner (staff-authenticated). Returns a result for the green/red screen.
+export type CheckInResult = { ok: boolean; name: string; reason?: string; duplicate?: boolean };
+
+export async function checkInMember(memberId: string): Promise<CheckInResult> {
+  const m = await getMember(memberId);
+  if (!m) return { ok: false, name: "", reason: "Unknown code" };
+  const name = `${m.first_name} ${m.last_name ?? ""}`.trim();
+  if (m.status !== "active") return { ok: false, name, reason: "Membership inactive" };
+
+  const s = await getMembership(memberId);
+  if (s && s.payment_status === "overdue") return { ok: false, name, reason: "Payment due" };
+
+  // Duplicate-scan window: ignore a second scan within 1 hour (D-20 hardening).
+  const recent = await memberCheckIns(memberId);
+  const lastIso = recent[0]?.checked_in_at;
+  if (lastIso && Date.now() - new Date(lastIso).getTime() < 60 * 60 * 1000) {
+    return { ok: true, name, duplicate: true };
+  }
+
+  if (isDemoMode) {
+    state.checkIns.unshift({
+      id: `c${Date.now()}`, gym_member_id: memberId, member_name: name,
+      method: "qr_phone", checked_in_at: new Date().toISOString(),
+    });
+    return { ok: true, name };
+  }
+  const { error } = await supabase().from("check_ins").insert({ gym_id: m.gym_id, gym_member_id: memberId, method: "qr_phone" });
+  if (error) return { ok: false, name, reason: error.message };
+  return { ok: true, name };
+}
+
+// Whether the signed-in member's QR should be active (D-20): active + not overdue.
+export async function myQrActive(): Promise<{ active: boolean; reason?: string }> {
+  const m = await getCurrentMember();
+  if (!m) return { active: false, reason: "No membership found" };
+  if (m.status !== "active") return { active: false, reason: "Membership inactive" };
+  const s = await getMembership(m.id);
+  if (s && s.payment_status === "overdue") return { active: false, reason: "Payment due — see the front desk" };
+  return { active: true };
+}
+
+// Owner/staff system notifications (Step 6F, D-23) — derived live from existing analytics.
+// At-risk members (drop-off) + overdue payments. No new tables needed.
+export type OwnerNotification = { id: string; kind: "at_risk" | "overdue"; text: string; href: string };
+
+export async function getOwnerNotifications(): Promise<OwnerNotification[]> {
+  const out: OwnerNotification[] = [];
+  const summaries = await attendanceSummaries();
+  for (const s of summaries) {
+    if (s.visitsPrev30 > 0 && s.visitsLast30 < s.visitsPrev30 / 2) {
+      out.push({
+        id: `risk-${s.member.id}`, kind: "at_risk",
+        text: `${s.member.first_name} ${s.member.last_name ?? ""} is fading — ${s.visitsPrev30}→${s.visitsLast30} visits`,
+        href: `/members/view?id=${s.member.id}`,
+      });
+    }
+  }
+  const members = await listMembers();
+  for (const m of members) {
+    const s = await getMembership(m.id);
+    if (s?.payment_status === "overdue") {
+      out.push({ id: `due-${m.id}`, kind: "overdue", text: `${m.first_name} ${m.last_name ?? ""} — payment overdue`, href: `/members/view?id=${m.id}` });
+    }
+  }
+  return out;
 }
 
 export async function listAnnouncements(): Promise<Announcement[]> {

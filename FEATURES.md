@@ -9,7 +9,7 @@
 
 ### CRM (Owner/Admin Web Dashboard)
 
-- ✅/⬜ **Authentication:** ✅ real magic-link login (Supabase, PKCE, invite-only), session guard on all pages (proxy), logout, auth callback; demo mode keeps the mock. ⬜ join-via-invite-code (member app flow).
+- ✅/⬜ **Authentication & role routing:** ✅ real magic-link login (invite-only), server-side code exchange, session guard, logout, **one login → role router (owner/manager→CRM, coach/receptionist→restricted CRM, member→/app), member/staff two-way guard, no-access page** (Step 6A/6B). ⬜ join-via-invite-code.
 - ✅/⬜ **Dashboard:** today's classes, attendance, active members, expiring memberships. ✅ **Live check-in feed (realtime)** and **at-risk member alert** already built. **[added: live feed + at-risk were missing from draft]**
 - ✅/⬜ **Member Management:** ✅ list/search/create/deactivate. ⬜ profile editing, emergency contacts, DOB, medical notes, boxing fields (weight class, skill level, fight record), coach notes, waiver upload, bulk QR card print sheet, **archive = soft-delete only (never hard delete)** **[added]**, **bulk actions** **[added]**, **trial role (walk-in, no booking)** **[added]**, **onboarding lifecycle: add ⇒ Invited (email activation link) ⇒ Joined-unpaid (app access, QR blocked) ⇒ Active on payment confirmation (D-24)** **[added]**.
 - ✅/⬜ **Attendance Analytics ("Logs" — core must-have):** ✅ busiest days, per-member trends/streaks, drop-off detection, revenue-at-risk number. ⬜ per-class attendance view. **[added — entire section was missing from draft]**
@@ -27,7 +27,7 @@
 ### QR Check-In System (the #1 must-have — its own section) **[added: draft had only the kiosk screen]**
 
 - ✅ Unique QR per member; deactivated membership ⇒ scan rejected ("interconnected").
-- ⬜ **Unpaid ⇒ no access (D-20):** member app hides the QR tab AND the check-in scanner rejects an unpaid member at the door (enforced both client + server; screenshot of old QR must still fail). Grace-period/what-counts-as-unpaid pending G1.
+- ✅/⬜ **Unpaid ⇒ no access (D-20):** ✅ member app hides QR when overdue/inactive; ✅ scanner rejects unpaid/inactive at the door ("Payment due ✗"); ✅ duplicate-scan window (1h). ⬜ grace-period timer + auto-notify (needs G1 grace length).
 - ⬜ Secure token flow (SHA-256, shown/printed once), duplicate-scan window (1 h), brute-force rate limiting, kiosk offline fallback (manual mode), first-scan "Welcome to OxRound" moment, in-gym QR poster.
 
 ### Member App & Kiosk (Mobile/Tablet)
@@ -38,9 +38,11 @@
 - ⬜ **Splash & Login:** doors-opening owner-photo splash *(preview ✅)*, welcome flow, email OTP login.
 - ⬜ **Home:** today's classes, upcoming bookings, membership status, announcements feed *(preview ✅)*.
 - ⬜ **Class Schedule:** browse, spots left, book/waitlist *(preview ✅)*; filter by coach/type, cancel booking.
-- ⬜ **My QR:** full-screen check-in code *(preview ✅)*.
-- ⬜ **MyOx (engagement tab, D-22):** personal streak, visits vs last month, milestone badges, motivational nudges, opt-in leaderboard (later) — retention driver, built from existing check-in data. **[added]**
-- ⬜ **Profile / More:** membership status, renewal date, attendance history *(preview ✅)*, emergency contact — plus Schedule+booking moved here (D-22). Primary tabs: Home · MyOx · My QR · More.
+- ✅ **My QR:** real per-member check-in code (`oxround:checkin:<id>`), gated by payment (D-20).
+- ✅ **MyOx (D-22):** streak, visits this month vs all-time, milestone badges (10/25/50/100/250), motivational nudge — from real check-in data. ⬜ opt-in leaderboard (later).
+- ✅ **Home · MyOx · My QR · More** tab structure; Schedule+booking + Profile under More (D-22). Member app wired to the signed-in member's real data (Step 6C).
+- ✅ **QR check-in scanner** (CRM `/scanner`): iPad/phone camera reads member QR → green "Welcome"/red "inactive/payment due" (Step 6D).
+- ✅ **Owner notification bell 🔔:** at-risk + overdue alerts, derived live (Step 6F/D-23). ⬜ messages + community-post notifications (need messaging tables).
 - ⬜ **Staff Directory:** coach profiles.
 - ⬜ **Kiosk Screen:** locked tablet camera view, dynamic states ("Welcome, Marco ✓" / "Membership inactive ✗").
 - ⬜ **Push Notifications:** booking confirmed, class cancelled, waitlist opened, announcements — **+ in-app notification feed as fallback when push fails** **[added]**, **push opt-out handled gracefully** **[added]**, **offline mode: cached schedule + graceful errors** **[added]**.
