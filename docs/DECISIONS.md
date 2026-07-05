@@ -120,7 +120,8 @@ Review this at the start of every session. Resolve decisions before building the
 - What counts as "not paying"? Default: `payment_status='overdue'` = blocked; `comped` (staff/free) always exempt; `pending` (new member, first invoice unpaid) — block or allow? TBD.
 - Grace period: block the instant payment is late, or allow N days? Locking a loyal member over a late e-transfer is bad UX — most gyms allow a short grace window. **G1 business decision.**
   **Related:** extends the existing "deactivated membership ⇒ scan rejected" behavior (D-03/check-in fn) from *status* to *payment_status*.
-  **Status:** ✅ Spec recorded — grace-period + pending rule pending G1; build with Step 6 (6C3 My QR, 6D scanner).
+  **RESOLVED (2026-07-04):** there IS a grace period (avoid locking a loyal member over a late e-transfer). During grace, the member keeps QR access, but the **owner is notified** — a small callout/textbox in the CRM's notification area flags "X is past due (in grace until DATE)" so the owner can act. After grace expires unpaid → QR blocked (app hides + scanner rejects). `comped`/staff always exempt. Exact grace length = G1 business input (default 7 days).
+**Status:** ✅ Resolved — grace period + owner notification; build with Step 6 (6C3, 6D, 6F3 bell).
 
 ### D-21 · Coaches (and receptionists) get a role-scoped CRM view, not a separate app
 
@@ -149,7 +150,7 @@ Review this at the start of every session. Resolve decisions before building the
 **Spec (2026-07-04):** add member↔gym communication across both apps.
 
 - **Community tab** (both CRM and member app): staff (owner/coach) post; members view + react. This is the existing `announcements` feature (table, reactions, read-counts already built) surfaced as a "Community" tab. Members are read+react only; staff post.
-- **Messaging** (net-new): direct messages between staff and members. **Scope — needs decision:** (1) staff→member one-way, (2) staff↔member two-way 1:1 [recommended for pilot], (3) + broadcast/segments ("all overdue", "Tuesday class"). Default to build: two-way 1:1 + broadcast-to-all.
+- **Messaging** (net-new): direct messages between staff and members. **RESOLVED (2026-07-04): two-way 1:1 + broadcast.** Staff and members can message each other; staff can also broadcast to all (or segments later).
 - **Notification bell** 🔔 in the top bar of both apps: carries THREE kinds — (1) direct messages, (2) new community posts, (3) **system/automated notifications** (below). Schema already has a `notifications` table + `announcement_reads` scaffolding.
 - **System notifications (role-specific content):**
   - *Owner/staff CRM:* at-risk member (drop-off), payment overdue, new member joined/activated, waitlist filled, low class capacity. Start with **at-risk + overdue** (data already computed on the dashboard).
@@ -157,8 +158,7 @@ Review this at the start of every session. Resolve decisions before building the
   - *Two implementation styles:* **derived/computed** live from existing analytics (at-risk, overdue — near-zero new work, reuses dashboard logic) vs **stored events** in the `notifications` table (cancellations, bookings, activations).
     **Permissions:** owner/coach = post to community + send messages; receptionist per D-21; member = view community + react, receive/reply to messages (if two-way).
     **Relation to existing:** pulls the Phase 3 "community feed (gym-scoped)" and "email blast" ideas forward; the "in-app notification feed" already noted as push fallback becomes this bell.
-    **Open:** two-way vs one-way messaging (owner inbox load); whether members can start a thread or only reply.
-    **Status:** ✅ Recorded — messaging scope pending confirmation; build within Step 6.
+    **Status:** ✅ Resolved (2026-07-04) — two-way 1:1 + broadcast; build within Step 6 (6F).
 
 ### D-24 · Member onboarding lifecycle — invite → join → activate-on-payment
 
@@ -175,7 +175,8 @@ Review this at the start of every session. Resolve decisions before building the
    **Members-tab UI:** show the real state — Invited / Joined-unpaid / Active / Overdue — not just "active".
    **Dependencies:** (a) emailing real members needs custom SMTP (Resend) + verified domain — same wall as owner invite (5.4); testable with own emails until then. (b) the invite-send runs server-side with the service-role key (net-new small server action / Edge Function) — never in the browser.
    **Relation:** the QR gating is exactly D-20; comped/staff skip the payment gate.
-   **Status:** ✅ Recorded — build within Step 6 (member onboarding); email step blocked on domain.
+   **RESOLVED (2026-07-04):** an invited member who logs in DOES get app access (browse schedule/community/profile) but their status is **inactive with no QR set up** until the owner confirms payment — then they become active and the QR works. Matches D-20.
+**Status:** ✅ Resolved — build within Step 6 (member onboarding); email step blocked on domain.
 
 ## 🟢 Business / Strategy Decisions (can defer)
 
