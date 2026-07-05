@@ -53,11 +53,13 @@ Everything above ships a demo. Real G1 data requires:
 - [x] 5.1 Build B1 (below): magic-link login with `@supabase/ssr`, session guard on all pages, logout. The mock login page at `/login` is the UI starting point.
 - [ ] 5.2 **Auth URL config (classic gotcha):** Supabase → Authentication → URL Configuration → set **Site URL** to your Vercel URL (later `app.oxround.com`) and add `http://localhost:3000/**` to **Redirect URLs**. Skip this and every magic-link email redirects to localhost — logins mysteriously fail for anyone but you.
 - [ ] 5.3 Only then: add `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel → Settings → Environment Variables (Production + Preview) → Redeploy.
-- [ ] 5.4 **Custom SMTP (required — default sender won't email the owner):** create a free Resend account (100 emails/day) → verify your sending domain (oxround.com) → Supabase → Authentication → Emails → SMTP Settings → enter Resend's SMTP credentials. Then raise the email rate limit (Authentication → Rate Limits) to something sane like 30/hr.
+- [ ] 5.4 **Custom SMTP (required — default sender won't email the owner). Resend account ✅ made.** In Resend: add + verify your sending domain (oxround.com) via the DNS records they show (needs the domain — Step 4). Create an API key. Then Supabase → Authentication → Emails → SMTP Settings → host `smtp.resend.com`, port 465, user `resend`, password = the API key, sender `no-reply@oxround.com`. Then raise the email rate limit (Authentication → Rate Limits) to ~30/hr.
 - [ ] 5.5 Invite the G1 owner: Supabase → Authentication → Users → Invite user (his email). Then create the G1 gym row + his `gym_members` row with `roles={owner}` (prod-safe SQL: run `supabase/bootstrap-owner.sql` in the SQL editor — replace the email/name placeholders).
 - [ ] 5.6 Verify AS HIM from the app (not the SQL editor): log in → add member → print QR → record payment → post announcement.
 - [ ] 5.7 Law 25 minimum before real member data: privacy policy page linked in the footer + named privacy officer (you) + **sign the Supabase DPA** (Dashboard → Organization → Legal Documents — self-serve).
 - [ ] 5.8 Free tier has NO backups. The moment real data exists, take a weekly manual backup: `supabase db dump -f backup-$(date +%F).sql` (keep the files somewhere outside the repo). ⚠️ This command needs Docker Desktop installed and running (it dumps via a container) — install it then, or ask Claude for a Docker-free alternative. Stops being needed at the Supabase Pro upgrade.
+
+- [ ] 5.9 **Error monitoring (Sentry account ✅ made):** add `@sentry/nextjs` to `apps/web` (Claude does this — ~15 min), set the Sentry DSN as a Vercel env var. Then you see owner-facing crashes before he reports them. Pair with UptimeRobot (free) pinging the site + the check-in function.
 
 > Note for later: when announcement **image uploads** are built, the Storage buckets will need their own access policies (buckets don't inherit table RLS). Not needed while uploads are unbuilt.
 
@@ -96,7 +98,43 @@ Everything above ships a demo. Real G1 data requires:
 
 **CRM go-live gate:** owner logs in on his own laptop → adds a member → prints QR → marks payment → deactivates a test member → posts an announcement. All on app.oxround.com.
 
-## Phase C — Member app (Stage 2: ~3–6 weeks)
+## Step 6 — One login → two apps (owner CRM + member web app) + end-to-end QR (current plan — D-19, ~1–2 weeks)
+
+> Supersedes the native "Phase C" below for the pilot. One sign-in page routes by role: **owner/staff → CRM** (`/`), **member → member web app** (`/app`). The `/app` preview already has the member screens on shared demo data — this wires them to real per-member logins + data. The iPad check-in scanner is a tab inside the owner's CRM (no separate kiosk; the iPad is logged in as the gym, which sidesteps D-01). The verify-and-record `check-in` function is already deployed.
+>
+> **Reused, already built:** roles are already stamped into the login token (migration 0003 `custom_access_token_hook`); the `check-in` function; RLS scaffolding; the CRM auth/guard; the whole `/app` preview UI.
+
+### 6A — One login, THREE destinations (role routing)
+- [ ] 6A1. Member auth path: email magic-link/OTP login (reuse the CRM auth system already built), plus a "join gym" link so a new member's account links to G1.
+- [ ] 6A2. Role router: after sign-in, read roles from the session → `owner`/`manager` → full CRM (`/`); `coach`/`receptionist` → **restricted CRM view** (D-21); `member` → member app (`/app`); none → "no access yet / contact your gym" screen.
+- [ ] 6A3. Two-way guard (extends the existing guard `apps/web/src/proxy.ts`): a member who opens a CRM URL is bounced to `/app`; an owner who opens `/app` is allowed only as preview (decide: block vs allow). Staff-only pages stay staff-only.
+
+### 6B — Owner / staff CRM side (same app, role-scoped — NOT a separate app)
+- [ ] 6B1. Restrict all CRM pages to staff roles (guard currently checks "logged in," not "is staff").
+- [ ] 6B2. **Per-role tab + action visibility (D-21):** owner/manager = everything; coach = schedule / their classes / rosters / mark attendance / scanner / member contact info — NO payments, plans, settings, reports; receptionist = the coach set + payments/check-in, no settings. One CRM, tabs and buttons shown by role.
+- [ ] 6B3. Add a **Scanner** tab to the CRM nav → the iPad scanner page (6D). Available to owner/manager/coach/receptionist.
+
+### 6C — Member web app side (`/app`, currently a preview)
+- [ ] 6C1. Gate `/app` behind member login; per-member RLS so each member sees only their own bookings/QR/profile — never other members, never owner data.
+- [ ] 6C2. Wire each preview screen (home, schedule, booking, profile) to the logged-in member's real data (not hardcoded "Marco").
+- [ ] 6C3. **My QR tab**: renders that member's real check-in token as the QR. **Unpaid members (D-20): hide the QR, show "Payment due — see front desk."**
+- [ ] 6C4. Booking/cancel writes to DB with capacity + waitlist.
+- [ ] 6C5. PWA polish: Add-to-Home-Screen (icon, full-screen), keep-screen-awake while the QR is shown.
+- [ ] 6C6. **Tab restructure (D-22):** new primary **MyOx** tab (streak, visits vs last month, milestone badges, motivational nudges — from existing check-in data); move **Schedule + booking under a "More" area** (with Profile/account); keep a "Book next class" shortcut on Home. Primary tabs → Home · MyOx · My QR · More.
+
+### 6D — The QR scan, end-to-end (brain already deployed)
+- [ ] 6D1. Scanner page in the CRM: opens the iPad camera, reads the member's on-screen QR, calls the deployed `check-in` function.
+- [ ] 6D2. Result screen: "Welcome, Marco ✓" (green) / "Membership inactive ✗" / "Payment due ✗" (red). **Payment check is server-side in the `check-in` function (D-20) — the authoritative block; hiding the in-app QR is only a nudge.**
+- [ ] 6D3. Hardening: ignore duplicate scans within 1 h.
+
+### 6E — Prove it
+- [ ] 6E1. Two real devices: member logs in on a phone → My QR tab → iPad (owner's CRM Scanner) reads it → member appears in the live feed + analytics.
+
+Native iOS/Android apps: deferred to post-pilot (adds reliable push + store presence). Old native plan kept below for that stage.
+
+---
+
+## Phase C — Member app, NATIVE (DEFERRED to post-pilot per D-19; ~3–6 weeks when reached)
 
 Backend prerequisites (member app is useless without schedule data):
 - [ ] C1. Classes + sessions: CRM class management page, session generation (pg_cron weekly), schedule API.

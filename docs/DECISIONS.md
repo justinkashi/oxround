@@ -101,6 +101,45 @@ Review this at the start of every session. Resolve decisions before building the
 
 ---
 
+### D-19 · Member app: website-first (PWA) before native
+
+**Decision (2026-07-04):** Build the member app as a responsive website (installable PWA at `/app`) FIRST, and ship native iOS/Android apps later as an upgrade. Supersedes the native-first plan in DEPLOY.md Phase C for the pilot.
+**Why:** the full QR check-in loop needs no native powers — the member only *displays* a QR (any browser does this), and the iPad *reads* it via browser camera in the owner's CRM (which also sidesteps D-01 kiosk auth, since the iPad is logged in as the gym). Ships in ~days vs ~1–2 months, $0 vs Apple $99/yr + store reviews, and it's the same Expo codebase the native apps later grow from.
+**Known trade-off (accepted):** reliable push notifications need native — website push is Android-only in practice and requires "Add to Home Screen" on iPhone ([Apple docs](https://developer.apple.com/documentation/usernotifications/sending-web-push-notifications-in-web-apps-and-browsers)). Push is a retention polish, not needed for check-in; it's the main reason to build native later, once G1 is paying.
+**Build checklist:** member magic-link login + per-member RLS → wire `/app` preview screens to real member data → real "My QR" token → booking writes → iPad scanner page in CRM → end-to-end test. Native app (old Phase C / DEPLOY) deferred to post-pilot.
+**Status:** ✅ Decided, plan recorded — build not started (user: "only record the plan for now").
+
+### D-20 · Unpaid members lose QR / check-in access
+
+**Spec (2026-07-04):** a member who isn't paying can't check in. Enforced in TWO layers:
+1. **Member app** hides the My QR tab, showing "Membership payment due — see the front desk" (nudge).
+2. **`check-in` function** re-checks payment status at scan time and rejects with red "Payment due ✗" (authoritative — a screenshot of an old QR must still fail, since the QR token is static).
+**Open questions (need G1 input before final rule):**
+- What counts as "not paying"? Default: `payment_status='overdue'` = blocked; `comped` (staff/free) always exempt; `pending` (new member, first invoice unpaid) — block or allow? TBD.
+- Grace period: block the instant payment is late, or allow N days? Locking a loyal member over a late e-transfer is bad UX — most gyms allow a short grace window. **G1 business decision.**
+**Related:** extends the existing "deactivated membership ⇒ scan rejected" behavior (D-03/check-in fn) from *status* to *payment_status*.
+**Status:** ✅ Spec recorded — grace-period + pending rule pending G1; build with Step 6 (6C3 My QR, 6D scanner).
+
+### D-21 · Coaches (and receptionists) get a role-scoped CRM view, not a separate app
+
+**Spec (2026-07-04):** coaches and receptionists log into the SAME CRM as the owner, but see a restricted set of tabs/actions by role — not a third separate web app. Enforced two layers: UI hides tabs/buttons by role (UX), and RLS/role checks block the data server-side (authoritative — a coach can't reach payments by typing the URL).
+**Default permissions matrix (needs G1 confirmation):**
+- `owner` / `manager`: everything.
+- `coach`: view schedule + their assigned classes, class rosters, mark attendance/no-show, run check-in scanner, view member contact info. NO payments, plans, settings, reports, revenue.
+- `receptionist`: coach set + record payments + check-in. NO settings, no revenue reports.
+- `member`: member app only (never the CRM).
+**Why same-app-scoped:** one codebase, one deploy; matches how the roles array + `is_staff()` already work. A separate coach app would triple maintenance for no benefit.
+**Status:** ✅ Approach recorded — exact per-role permissions pending G1; build within Step 6 (6A2 router, 6B2 visibility).
+
+### D-22 · Member app tab structure — add "MyOx" engagement tab, move Schedule under "More"
+
+**Spec (2026-07-04):** restructure the member web app's bottom nav for retention.
+- **New primary tab "MyOx"** — personal analytics + gamification to drive daily return: current streak (🔥 N weeks), visits this month vs last, total-classes milestones/badges, personal bests, motivational nudges ("2 more to beat last week"), opt-in leaderboard (later). Built from check-in data already collected (CRM `attendanceSummaries()` already computes streaks/visits).
+- **Schedule + booking move under a "More"/Settings area** (with Profile, membership, account) — no longer a primary tab.
+- Likely primary tabs become: **Home · MyOx · My QR · More**.
+**UX flag (accepted by product owner):** Schedule is a high-frequency action; burying it may reduce bookings. Mitigation: keep a "Book next class" shortcut on Home even with the full schedule under More.
+**Status:** ✅ Direction recorded — build within Step 6 (member app, 6C). Update the `/app` preview to match when convenient.
+
 ## 🟢 Business / Strategy Decisions (can defer)
 
 ### D-14 · Budget projection vs. investor brief target mismatch

@@ -15,7 +15,7 @@
 - ✅/⬜ **Attendance Analytics ("Logs" — core must-have):** ✅ busiest days, per-member trends/streaks, drop-off detection, revenue-at-risk number. ⬜ per-class attendance view. **[added — entire section was missing from draft]**
 - ✅/⬜ **Class Scheduling:** ✅ weekly schedule grid, create class, recurring days, capacity limits, coach assignment, class colors, deactivate class, cancel-session flow. ⬜ edit existing class, **auto-notification to booked members on cancellation** **[added]**.
 - ✅/⬜ **Booking Management:** ✅ per-session rosters, waitlist (auto-waitlist when full + promote), spots remaining, cancel/no-show/attended marking, book member from CRM. ⬜ **no-show fees — automated penalty logic (needs G1 decision)** **[added]**, **automatic `attended` reconciliation when a booked member checks in** **[added]**.
-- ✅/⬜ **Coach Management:** ✅ staff list, promote member to coach, remove coach role, role badges. ⬜ profiles (photo/bio/experience), coach scheduling, **coach invite flow (email → role)** **[added]**.
+- ✅/⬜ **Coach Management:** ✅ staff list, promote member to coach, remove coach role, role badges. ⬜ profiles (photo/bio/experience), coach scheduling, **coach invite flow (email → role)** **[added]**, **role-scoped CRM view for coach/receptionist (D-21 — restricted tabs/actions, same app not a separate one)** **[added]**.
 - ✅/⬜ **Membership Plans:** ✅ all plan kinds (monthly/annual/drop-in/punch-card/family/trial/intro-offer), create + activate/deactivate. ⬜ assign/freeze/renew/expire per member.
 - ✅/⬜ **Manual Payments:** ✅ payment status per member, record payments (cash/e-transfer/card), payment history, daily + monthly totals, recording marks membership paid. ⬜ printable invoices.
 - ✅/⬜ **Communication:** ✅ announcements with types (closure/fight/event), pinning, read counts, reactions. ⬜ image uploads (+compression), **announcement expiry/auto-archive** **[added]**, **email blast to members** **[added]**, deactivation notification (member is told their QR stopped working — never surprised at the door).
@@ -26,17 +26,20 @@
 ### QR Check-In System (the #1 must-have — its own section) **[added: draft had only the kiosk screen]**
 
 - ✅ Unique QR per member; deactivated membership ⇒ scan rejected ("interconnected").
+- ⬜ **Unpaid ⇒ no access (D-20):** member app hides the QR tab AND the check-in scanner rejects an unpaid member at the door (enforced both client + server; screenshot of old QR must still fail). Grace-period/what-counts-as-unpaid pending G1.
 - ⬜ Secure token flow (SHA-256, shown/printed once), duplicate-scan window (1 h), brute-force rate limiting, kiosk offline fallback (manual mode), first-scan "Welcome to OxRound" moment, in-gym QR poster.
 
 ### Member App & Kiosk (Mobile/Tablet)
 
-> ✅ **Web preview of the member app is live at `/app`** (phone-framed, real shared data, doors splash, booking works). The real Expo app remains ⬜ — statuses below track the real app.
+> ✅ **Web preview of the member app is live at `/app`** (phone-framed, real shared data, doors splash, booking works).
+> **Direction (D-19):** ship the member app as a WEBSITE/PWA first (wire this preview to real member logins + data), native iOS/Android later. Statuses below track the real member-facing app; "(preview ✅)" = built in the demo, needs real-data wiring.
 
 - ⬜ **Splash & Login:** doors-opening owner-photo splash *(preview ✅)*, welcome flow, email OTP login.
 - ⬜ **Home:** today's classes, upcoming bookings, membership status, announcements feed *(preview ✅)*.
 - ⬜ **Class Schedule:** browse, spots left, book/waitlist *(preview ✅)*; filter by coach/type, cancel booking.
 - ⬜ **My QR:** full-screen check-in code *(preview ✅)*.
-- ⬜ **Profile:** membership status, renewal date, attendance history *(preview ✅)*; emergency contact.
+- ⬜ **MyOx (engagement tab, D-22):** personal streak, visits vs last month, milestone badges, motivational nudges, opt-in leaderboard (later) — retention driver, built from existing check-in data. **[added]**
+- ⬜ **Profile / More:** membership status, renewal date, attendance history *(preview ✅)*, emergency contact — plus Schedule+booking moved here (D-22). Primary tabs: Home · MyOx · My QR · More.
 - ⬜ **Staff Directory:** coach profiles.
 - ⬜ **Kiosk Screen:** locked tablet camera view, dynamic states ("Welcome, Marco ✓" / "Membership inactive ✗").
 - ⬜ **Push Notifications:** booking confirmed, class cancelled, waitlist opened, announcements — **+ in-app notification feed as fallback when push fails** **[added]**, **push opt-out handled gracefully** **[added]**, **offline mode: cached schedule + graceful errors** **[added]**.

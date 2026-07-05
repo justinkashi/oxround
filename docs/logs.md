@@ -1,4 +1,10 @@
-July 3 
+July 5 
+
+* adding glofit as competitors in the list
+* Whats the status of QR codes
+* 
+
+July 3
 
 - should have a bilingual version for montreal french
 - Scaling to yoga studios, pilates, dance, partnerships with classpass,

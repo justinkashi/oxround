@@ -7,7 +7,7 @@
 -- the gym or membership thanks to the unique slug / (gym_id, user_id) constraints.
 
 WITH me AS (
-  SELECT id, email FROM auth.users WHERE email = 'OWNER_EMAIL_HERE'
+  SELECT id, email FROM auth.users WHERE email = 'justin.kashi@hotmail.com'
 ),
 gym AS (
   INSERT INTO gyms (name, slug)
@@ -17,15 +17,15 @@ gym AS (
 ),
 prof AS (
   INSERT INTO profiles (id, first_name, last_name)
-  SELECT id, 'FIRST_NAME_HERE', 'LAST_NAME_HERE' FROM me
+  SELECT id, 'Justin', 'Kashi' FROM me
   ON CONFLICT (id) DO NOTHING
 )
 INSERT INTO gym_members (gym_id, user_id, first_name, last_name, email, roles, status, joined_at)
-SELECT gym.id, me.id, 'FIRST_NAME_HERE', 'LAST_NAME_HERE', me.email, ARRAY['owner'], 'active', CURRENT_DATE
+SELECT gym.id, me.id, 'Justin', 'Kashi', me.email, ARRAY['owner'], 'active', CURRENT_DATE
 FROM gym, me
 ON CONFLICT (gym_id, user_id) DO NOTHING;
 
 -- Verify (should return 1 row with roles = {owner}):
 SELECT gm.first_name, gm.roles, g.name AS gym
 FROM gym_members gm JOIN gyms g ON g.id = gm.gym_id
-WHERE gm.email = 'OWNER_EMAIL_HERE';
+WHERE gm.email = 'justin.kashi@hotmail.com';
