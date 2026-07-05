@@ -11,7 +11,10 @@ export default function MembersPage() {
   const [memberships, setMemberships] = useState<Record<string, Membership | null>>({});
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "member" as "member" | "coach" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = async () => {
     const ms = await listMembers();
@@ -27,15 +30,28 @@ export default function MembersPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createMember(form);
-    // D-24: email the new member an activation link (no-op in demo mode).
-    if (form.email) {
-      const r = await inviteMemberEmail(form.email);
-      if (!r.ok) console.warn("invite email failed:", r.error);
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      await createMember(form);
+      // D-24: email the new person an activation link (member → app, coach → CRM). No-op in demo.
+      if (form.email) {
+        const r = await inviteMemberEmail(form.email);
+        setNotice(r.ok
+          ? `${form.first_name} added — invite emailed to ${form.email}.`
+          : `${form.first_name} added, but the invite email didn't send (${r.error}). Deploy the invite function or invite them from Supabase.`);
+      } else {
+        setNotice(`${form.first_name} added (no email — they can't get an app invite until you add one).`);
+      }
+      setForm({ first_name: "", last_name: "", email: "", phone: "", role: "member" });
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add — please try again.");
+    } finally {
+      setBusy(false);
     }
-    setForm({ first_name: "", last_name: "", email: "", phone: "" });
-    setShowForm(false);
-    load();
   };
 
   return (
@@ -47,19 +63,28 @@ export default function MembersPage() {
         </button>
       </div>
 
+      {notice && <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800">{notice}</div>}
+
       {showForm && (
-        <form onSubmit={submit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2 md:grid-cols-5">
+        <form onSubmit={submit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2 md:grid-cols-6">
           {(["first_name", "last_name", "email", "phone"] as const).map((f) => (
             <input
               key={f}
               required={f === "first_name"}
+              type={f === "email" ? "email" : "text"}
               placeholder={f.replace("_", " ")}
               value={form[f]}
               onChange={(e) => setForm({ ...form, [f]: e.target.value })}
               className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
             />
           ))}
-          <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white">Create</button>
+          <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "member" | "coach" })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
+            <option value="member">Member</option>
+            <option value="coach">Coach</option>
+          </select>
+          <button type="submit" disabled={busy} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy ? "Adding…" : "Create"}</button>
+          {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700 sm:col-span-2 md:col-span-6">{error}</p>}
+          <p className="text-xs text-neutral-400 sm:col-span-2 md:col-span-6">Member → gets the member app. Coach → gets the CRM (restricted). An invite email is sent if you provide one.</p>
         </form>
       )}
 

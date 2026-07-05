@@ -48,6 +48,20 @@ export async function getMyRoles(): Promise<string[]> {
   return rolesFromToken(session?.access_token);
 }
 
+// The signed-in user's gym_id (from the JWT). Needed to stamp new rows with the tenant.
+export async function getMyGymId(): Promise<string | null> {
+  if (isDemoMode) return "g1";
+  const { data: { session } } = await supabase().auth.getSession();
+  const token = session?.access_token;
+  if (!token) return null;
+  try {
+    const json = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return (json.gym_id as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const STAFF_ROLES = ["owner", "manager", "coach", "receptionist"];
 export async function isStaffUser(): Promise<boolean> {
   const r = await getMyRoles();
@@ -131,35 +145,45 @@ export async function setMemberStatus(memberId: string, status: GymMember["statu
   await supabase().from("gym_members").update({ status }).eq("id", memberId);
 }
 
-export async function createMember(input: { first_name: string; last_name: string; email: string; phone: string }): Promise<GymMember> {
+export async function createMember(
+  input: { first_name: string; last_name: string; email: string; phone: string; role?: "member" | "coach" },
+): Promise<GymMember> {
+  const role = input.role ?? "member";
+  const { role: _omit, ...fields } = input;
   if (isDemoMode) {
     const m: GymMember = {
-      id: `m${Date.now()}`, gym_id: "g1", roles: ["member"], status: "active",
+      id: `m${Date.now()}`, gym_id: "g1", roles: [role], status: "active",
       joined_at: new Date().toISOString().slice(0, 10), emergency_contact: null,
-      first_name: input.first_name, last_name: input.last_name || null,
-      email: input.email || null, phone: input.phone || null,
+      first_name: fields.first_name, last_name: fields.last_name || null,
+      email: fields.email || null, phone: fields.phone || null,
     };
     state.members.push(m);
+    if (role === "member") {
+      state.memberships.push({ id: `s${Date.now()}`, gym_member_id: m.id, plan_name: "—", status: "active", payment_status: "pending", payment_method: null, start_date: m.joined_at!, next_billing_date: null });
+    }
     return m;
   }
+  const gymId = await getMyGymId();
+  if (!gymId) throw new Error("Could not determine your gym. Log out and back in.");
   // Real mode: raw token generated client-side ONCE for the QR; only SHA-256 stored (D-02).
   const raw = crypto.randomUUID() + crypto.randomUUID();
   const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
   const hash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
   const { data, error } = await supabase()
     .from("gym_members")
-    .insert({ ...input, roles: ["member"], check_in_token_hash: hash })
+    .insert({ ...fields, gym_id: gymId, roles: [role], check_in_token_hash: hash })
     .select()
     .single();
   if (error) throw error;
   const member = data as GymMember;
-  // D-24: new member starts UNPAID — a pending membership so their QR stays gated (D-20)
-  // until the owner records the first payment. (No plan_id yet; owner assigns on the plan.)
-  await supabase().from("memberships").insert({
-    gym_id: member.gym_id, gym_member_id: member.id,
-    status: "active", payment_status: "pending", start_date: new Date().toISOString().slice(0, 10),
-  });
-  // Caller is responsible for showing/printing `raw` immediately — it is not retrievable later.
+  // D-24: a new MEMBER starts UNPAID — pending membership gates their QR (D-20) until first payment.
+  // Coaches have no membership.
+  if (role === "member") {
+    await supabase().from("memberships").insert({
+      gym_id: gymId, gym_member_id: member.id,
+      status: "active", payment_status: "pending", start_date: new Date().toISOString().slice(0, 10),
+    });
+  }
   (data as Record<string, unknown>).__raw_token = raw;
   return member;
 }
@@ -403,7 +427,8 @@ export async function createAnnouncement(input: { title: string; body: string; t
     state.announcements.unshift({ id: `a${Date.now()}`, published_at: new Date().toISOString(), read_count: 0, reaction_count: 0, media_urls: [], ...input });
     return;
   }
-  const { error } = await supabase().from("announcements").insert(input);
+  const gymId = await getMyGymId();
+  const { error } = await supabase().from("announcements").insert({ ...input, gym_id: gymId });
   if (error) throw error;
 }
 
@@ -421,7 +446,8 @@ export async function createPlan(input: Omit<MembershipPlan, "id" | "gym_id" | "
     state.plans.push({ ...input, id: `p${Date.now()}`, gym_id: "g1", is_active: true });
     return;
   }
-  const { error } = await supabase().from("membership_plans").insert(input);
+  const gymId = await getMyGymId();
+  const { error } = await supabase().from("membership_plans").insert({ ...input, gym_id: gymId });
   if (error) throw error;
 }
 
@@ -467,8 +493,26 @@ export async function createClass(input: Omit<GymClass, "id" | "gym_id" | "is_ac
     state.sessions.sort((a, b) => a.session_date.localeCompare(b.session_date) || a.start_time.localeCompare(b.start_time));
     return;
   }
-  const { error } = await supabase().from("classes").insert(input);
+  const gymId = await getMyGymId();
+  const { data, error } = await supabase().from("classes").insert({ ...input, gym_id: gymId }).select().single();
   if (error) throw error;
+  // Generate session instances for the next 4 weeks (prod has no cron yet — DEPLOY C1).
+  // A weekly pg_cron job should extend this window going forward.
+  const cl = data as GymClass;
+  const rows: Array<Record<string, unknown>> = [];
+  const monday = new Date();
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  for (let d = 0; d < 28; d++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + d);
+    if (!cl.day_of_week.includes(day.getDay())) continue;
+    rows.push({
+      gym_id: gymId, class_id: cl.id, session_date: day.toISOString().slice(0, 10),
+      start_time: cl.start_time, duration_mins: cl.duration_mins, capacity: cl.capacity,
+      coach_id: cl.coach_id, status: "scheduled",
+    });
+  }
+  if (rows.length) await supabase().from("class_sessions").insert(rows);
 }
 
 export async function deactivateClass(classId: string): Promise<void> {
@@ -561,7 +605,8 @@ export async function addBooking(sessionId: string, memberId: string): Promise<v
     });
     return;
   }
-  await supabase().from("class_bookings").insert({ session_id: sessionId, gym_member_id: memberId, status });
+  const gymId = await getMyGymId();
+  await supabase().from("class_bookings").insert({ gym_id: gymId, session_id: sessionId, gym_member_id: memberId, status });
 }
 
 export async function setBookingStatus(bookingId: string, status: BookingStatus): Promise<void> {
@@ -621,7 +666,8 @@ export async function recordPayment(input: { gym_member_id: string; amount_cents
     if (s) s.payment_status = "paid";
     return;
   }
-  const { error } = await supabase().from("payments").insert(input);
+  const gymId = await getMyGymId();
+  const { error } = await supabase().from("payments").insert({ ...input, gym_id: gymId });
   if (error) throw error;
   await supabase().from("memberships").update({ payment_status: "paid" }).eq("gym_member_id", input.gym_member_id).eq("status", "active");
 }
@@ -644,7 +690,8 @@ export async function createLead(input: { first_name: string; last_name: string;
     });
     return;
   }
-  const { error } = await supabase().from("leads").insert(input);
+  const gymId = await getMyGymId();
+  const { error } = await supabase().from("leads").insert({ ...input, gym_id: gymId });
   if (error) throw error;
 }
 
