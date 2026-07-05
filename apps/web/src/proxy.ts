@@ -1,11 +1,24 @@
-// Route guard (DEPLOY.md 5.1). Real mode: every page requires a session except
-// /login and /auth/callback; also refreshes the session cookie on each request.
-// Demo mode (no Supabase env vars): no-op, everything stays open.
+// Route guard + role router (DEPLOY.md Step 6A).
+// Real mode: requires a session; routes by role — staff → CRM, member → /app.
+// Roles come from the JWT (custom_access_token_hook). Demo mode: no-op.
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback"];
+const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback", "/no-access"];
+const STAFF_ROLES = ["owner", "manager", "coach", "receptionist"];
+
+// Decode roles[] from the access-token JWT payload (already validated via getUser).
+function rolesFromToken(token: string | undefined): string[] {
+  if (!token) return [];
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(payload));
+    return Array.isArray(json.roles) ? json.roles : [];
+  } catch {
+    return [];
+  }
+}
 
 export default async function proxy(req: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,36 +37,55 @@ export default async function proxy(req: NextRequest) {
     },
   });
 
-  // IMPORTANT: getUser() (not getSession()) — validates the token server-side.
+  // getUser() validates the token server-side.
   const { data: { user } } = await supabase.auth.getUser();
 
   const path = req.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
-  // Auth links (magic link, invite, recovery) can land anywhere with ?code= —
-  // forward them to the callback so the code isn't lost.
+  // Auth links land anywhere with ?code= — forward to the callback.
   if (!user && req.nextUrl.searchParams.has("code") && !isPublic) {
     const cbUrl = req.nextUrl.clone();
     cbUrl.pathname = "/auth/confirm";
     return NextResponse.redirect(cbUrl);
   }
 
+  // Not logged in → login (except public pages).
   if (!user && !isPublic) {
     const loginUrl = req.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
     return NextResponse.redirect(loginUrl);
   }
-  if (user && path === "/login") {
-    const homeUrl = req.nextUrl.clone();
-    homeUrl.pathname = "/";
-    homeUrl.search = "";
-    return NextResponse.redirect(homeUrl);
+
+  if (user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const roles = rolesFromToken(session?.access_token);
+    const isStaff = roles.some((r) => STAFF_ROLES.includes(r));
+    const isMember = roles.includes("member");
+    const inMemberApp = path === "/app" || path.startsWith("/app/");
+    const redirectTo = (p: string) => {
+      const u = req.nextUrl.clone();
+      u.pathname = p;
+      u.search = "";
+      return NextResponse.redirect(u);
+    };
+
+    // Landed on /login while authed → send to the right home.
+    if (path === "/login") return redirectTo(isStaff ? "/" : isMember ? "/app" : "/no-access");
+
+    // No usable role at all → explain, don't loop.
+    if (!isStaff && !isMember && !isPublic) return redirectTo("/no-access");
+
+    // Member (not staff) trying to reach a CRM page → bounce to their app.
+    if (isMember && !isStaff && !inMemberApp && !isPublic) return redirectTo("/app");
+
+    // Staff on member app = allowed (preview). Staff on CRM = allowed.
   }
+
   return res;
 }
 
 export const config = {
-  // Everything except Next internals and static assets.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

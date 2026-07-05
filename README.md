@@ -12,7 +12,8 @@
 - **Phase:** DEPLOYED (free tier, demo mode). Live at the Vercel URL; Supabase project `oxround` in ca-central-1 with all 3 migrations, token hook, buckets, email provider configured. No env vars on Vercel yet — site intentionally runs demo mode until real auth exists.
 - **Built:** full clickable CRM (dashboard/live feed/at-risk, members, classes grid + rosters + waitlist, attendance, payments, plans, leads Kanban, coaches, announcements, reports+CSV, settings, mock login) + member-app preview at `/app` + responsive pass (mobile nav, stacking layouts, scrollable tables — desktop unchanged).
 - **DEPLOY.md status:** Steps 1–3 ✅, 4.5 (2FA) ✅, 5.1 (real auth CODE) ✅ built & verified — magic-link login, session guard (`apps/web/src/proxy.ts`), logout, `/auth/callback`, owner bootstrap SQL at `supabase/bootstrap-owner.sql`. Pending: 4.0 domain purchase (Resend prerequisite), 5.2–5.8 (config + owner onboarding).
-- **Next:** push auth code → Supabase URL config (5.2) → Vercel env vars (5.3) → test login with own email → domain + Resend (5.4) → invite G1 owner.
+- **AUTH LIVE (2026-07-05):** real magic-link login working end-to-end on production — owner logs in, lands in real (empty) CRM. Domain `oxround.com` on Cloudflare; `app.oxround.com`→Vercel (propagating); Resend verified, Supabase SMTP live (emails send from no-reply@oxround.com, 30/hr).
+- **Next:** build Step 6 (one login→role router→two apps + QR + D-20…D-24). Then invite real G1 owner + enter real data.
 - **Decided not yet built (D-19/D-21):** ONE login routes by role — owner/manager→full CRM, coach/receptionist→restricted CRM view (same app), member→`/app` web app; CRM gets a Scanner tab, member app gets a My QR tab; full end-to-end QR check-in. Native apps later. Full checklist = DEPLOY.md Step 6.
 - **Accounts ready:** Sentry ✅ + Resend ✅ made (wiring in DEPLOY 5.4 + 5.9). Domain still to buy.
 - **Last updated:** 2026-07-04 (real auth built; deployed + responsive earlier same day).
