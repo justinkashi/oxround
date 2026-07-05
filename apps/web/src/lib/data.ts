@@ -7,8 +7,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Announcement, BookingStatus, CheckIn, ClassBooking, ClassSession, GymClass, GymMember,
   GymSettings, Lead, LeadStatus, MemberAttendanceSummary, Membership, MembershipPlan,
-  Payment, PaymentStatus,
+  Message, Payment, PaymentStatus,
 } from "./types";
+
+// Grace period before a past-due member is treated as overdue (D-20). Default 7 days.
+export const GRACE_PERIOD_DAYS = 7;
 import {
   demoAnnouncements, demoBookings, demoCheckIns, demoClasses, demoLeads, demoMembers,
   demoMemberships, demoPayments, demoPlans, demoSessions, demoSettings,
@@ -73,6 +76,10 @@ const state = {
   payments: [...demoPayments],
   leads: [...demoLeads],
   settings: { ...demoSettings },
+  messages: [
+    { id: "msg1", sender_member_id: "m6", sender_name: "Tony Bélanger", recipient_member_id: null, body: "Reminder: no sparring class this Friday — coach away.", is_broadcast: true, created_at: new Date(Date.now() - 2 * 86400000).toISOString(), read_at: null },
+    { id: "msg2", sender_member_id: "m1", sender_name: "Marco Silva", recipient_member_id: null, body: "Hey, can I freeze my membership for July? Traveling.", is_broadcast: false, created_at: new Date(Date.now() - 86400000).toISOString(), read_at: null },
+  ] as Message[],
 };
 
 export async function listMembers(): Promise<GymMember[]> {
@@ -294,6 +301,90 @@ export async function getOwnerNotifications(): Promise<OwnerNotification[]> {
     }
   }
   return out;
+}
+
+// ============ MESSAGING (Step 6F / D-23) ============
+
+function mapMessages(rows: Array<Record<string, unknown> & { gym_members?: { first_name: string; last_name: string | null } | null }>): Message[] {
+  return rows.map((r) => ({
+    id: r.id as string,
+    sender_member_id: r.sender_member_id as string,
+    sender_name: r.gym_members ? `${r.gym_members.first_name} ${r.gym_members.last_name ?? ""}`.trim() : "",
+    recipient_member_id: (r.recipient_member_id as string | null) ?? null,
+    body: r.body as string,
+    is_broadcast: r.is_broadcast as boolean,
+    created_at: r.created_at as string,
+    read_at: (r.read_at as string | null) ?? null,
+  }));
+}
+
+// Member view: their 1:1 thread with the gym + broadcasts, oldest→newest.
+export async function myMessages(): Promise<Message[]> {
+  if (isDemoMode) {
+    const meId = "m1";
+    return state.messages
+      .filter((m) => m.is_broadcast || m.sender_member_id === meId || m.recipient_member_id === meId || (m.recipient_member_id === null && !m.is_broadcast))
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+  const { data, error } = await supabase()
+    .from("messages")
+    .select("*, gym_members!messages_sender_member_id_fkey(first_name, last_name)")
+    .order("created_at");
+  if (error) throw error;
+  return mapMessages(data as never[]);
+}
+
+// Member (or staff) sends a message. Broadcast only allowed for staff (RLS enforces).
+export async function sendMessage(input: { recipient_member_id: string | null; body: string; is_broadcast: boolean }): Promise<void> {
+  if (isDemoMode) {
+    const me = state.members.find((m) => m.id === "m1");
+    state.messages.push({
+      id: `msg${Date.now()}`, sender_member_id: "m1",
+      sender_name: me ? `${me.first_name} ${me.last_name ?? ""}`.trim() : "You",
+      recipient_member_id: input.recipient_member_id, body: input.body,
+      is_broadcast: input.is_broadcast, created_at: new Date().toISOString(), read_at: null,
+    });
+    return;
+  }
+  const meId = await currentMemberId();
+  const { error } = await supabase().from("messages").insert({
+    gym_id: (await getCurrentMember())?.gym_id, sender_member_id: meId,
+    recipient_member_id: input.recipient_member_id, body: input.body, is_broadcast: input.is_broadcast,
+  });
+  if (error) throw error;
+}
+
+// Staff sends to a specific member (reply) or broadcast.
+export async function staffSendMessage(input: { recipient_member_id: string | null; body: string; is_broadcast: boolean }): Promise<void> {
+  return sendMessage(input);
+}
+
+// Staff CRM view: all gym messages, newest first (thread-grouping done in the UI).
+export async function staffListMessages(): Promise<Message[]> {
+  if (isDemoMode) return [...state.messages].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const { data, error } = await supabase()
+    .from("messages")
+    .select("*, gym_members!messages_sender_member_id_fkey(first_name, last_name)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return mapMessages(data as never[]);
+}
+
+async function currentMemberId(): Promise<string | null> {
+  if (isDemoMode) return "m1";
+  const { data: { user } } = await supabase().auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase().from("gym_members").select("id").eq("user_id", user.id).maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+// Invite a member to the app (Step 6G): triggers the invite-member Edge Function (sends email + links account).
+export async function inviteMemberEmail(email: string): Promise<{ ok: boolean; error?: string }> {
+  if (isDemoMode) return { ok: true };
+  const { data, error } = await supabase().functions.invoke("invite-member", { body: { email } });
+  if (error) return { ok: false, error: error.message };
+  if (data?.error) return { ok: false, error: data.error };
+  return { ok: true };
 }
 
 export async function listAnnouncements(): Promise<Announcement[]> {

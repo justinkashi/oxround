@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createMember, getMembership, listMembers } from "@/lib/data";
+import { createMember, getMembership, inviteMemberEmail, listMembers } from "@/lib/data";
 import type { GymMember, Membership } from "@/lib/types";
 
 export default function MembersPage() {
@@ -28,6 +28,11 @@ export default function MembersPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     await createMember(form);
+    // D-24: email the new member an activation link (no-op in demo mode).
+    if (form.email) {
+      const r = await inviteMemberEmail(form.email);
+      if (!r.ok) console.warn("invite email failed:", r.error);
+    }
     setForm({ first_name: "", last_name: "", email: "", phone: "" });
     setShowForm(false);
     load();

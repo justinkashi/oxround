@@ -141,6 +141,17 @@ export interface Lead {
   created_at: string;
 }
 
+export interface Message {
+  id: string;
+  sender_member_id: string;
+  sender_name: string;
+  recipient_member_id: string | null;
+  body: string;
+  is_broadcast: boolean;
+  created_at: string;
+  read_at: string | null;
+}
+
 export interface GymSettings {
   name: string;
   address: string;

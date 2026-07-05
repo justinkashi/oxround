@@ -18,7 +18,8 @@ const nav: { href: string; label: string; roles?: string[] }[] = [
   { href: "/plans", label: "Plans", roles: ["owner", "manager"] },
   { href: "/leads", label: "Leads", roles: ["owner", "manager", "receptionist"] },
   { href: "/coaches", label: "Coaches", roles: ["owner", "manager"] },
-  { href: "/announcements", label: "Announcements" },
+  { href: "/announcements", label: "Community" },
+  { href: "/messages", label: "Messages" },
   { href: "/reports", label: "Reports", roles: ["owner", "manager"] },
   { href: "/settings", label: "Settings", roles: ["owner", "manager"] },
 ];

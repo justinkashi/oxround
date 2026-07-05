@@ -7,12 +7,12 @@ import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   addBooking, bookingCounts, getCurrentMember, getMembership, isDemoMode,
-  listAnnouncements, listSessions, memberCheckIns, myQrActive,
+  listAnnouncements, listSessions, memberCheckIns, myMessages, myQrActive, sendMessage,
 } from "@/lib/data";
-import type { Announcement, CheckIn, ClassSession, GymMember, Membership } from "@/lib/types";
+import type { Announcement, CheckIn, ClassSession, GymMember, Membership, Message } from "@/lib/types";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
-type Tab = "home" | "myox" | "qr" | "more";
+type Tab = "home" | "community" | "myox" | "qr" | "more";
 
 export default function MemberApp() {
   const [splash, setSplash] = useState(true);
@@ -24,6 +24,8 @@ export default function MemberApp() {
   const [visits, setVisits] = useState<CheckIn[]>([]);
   const [membership, setMembership] = useState<Membership | null>(null);
   const [qr, setQr] = useState<{ active: boolean; reason?: string }>({ active: false });
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [draft, setDraft] = useState("");
   const [bookedMsg, setBookedMsg] = useState("");
 
   useEffect(() => { const t = setTimeout(() => setSplash(false), 1800); return () => clearTimeout(t); }, []);
@@ -35,12 +37,13 @@ export default function MemberApp() {
     const today = new Date();
     const end = new Date();
     end.setDate(today.getDate() + 7);
-    const [ses, ann, chk, mem, q] = await Promise.all([
+    const [ses, ann, chk, mem, q, msgs] = await Promise.all([
       listSessions(iso(today), iso(end)),
       listAnnouncements(),
       memberCheckIns(member.id),
       getMembership(member.id),
       myQrActive(),
+      myMessages(),
     ]);
     const upcoming = ses.filter((s) => s.status === "scheduled");
     setSessions(upcoming);
@@ -49,6 +52,14 @@ export default function MemberApp() {
     setVisits(chk);
     setMembership(mem);
     setQr(q);
+    setMessages(msgs);
+  };
+
+  const send = async () => {
+    if (!draft.trim()) return;
+    await sendMessage({ recipient_member_id: null, body: draft.trim(), is_broadcast: false });
+    setDraft("");
+    load();
   };
   useEffect(() => { load(); }, []);
 
@@ -107,7 +118,7 @@ export default function MemberApp() {
           <div>
             <div className="text-xs text-neutral-400">G1 Boxing</div>
             <div className="text-sm font-semibold">
-              {tab === "home" ? `Hey ${firstName} 👋` : tab === "myox" ? "MyOx" : tab === "qr" ? "My QR" : "More"}
+              {tab === "home" ? `Hey ${firstName} 👋` : tab === "community" ? "Community" : tab === "myox" ? "MyOx" : tab === "qr" ? "My QR" : "More"}
             </div>
           </div>
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-xs font-bold">{initials}</div>
@@ -138,6 +149,36 @@ export default function MemberApp() {
                   <div className="mt-2 flex gap-3 text-xs text-neutral-400"><span>👊 {a.reaction_count}</span><span>{a.type}</span></div>
                 </div>
               ))}
+            </div>
+          ) : tab === "community" ? (
+            <div className="space-y-3">
+              <div className="text-xs font-semibold uppercase text-neutral-400">Gym feed</div>
+              {announcements.map((a) => (
+                <div key={a.id} className="rounded-xl bg-white p-3 shadow-sm">
+                  <div className="flex items-center gap-2">{a.pinned && <span className="text-xs">📌</span>}<span className="text-sm font-semibold">{a.title}</span></div>
+                  {a.body && <p className="mt-1 text-xs text-neutral-600">{a.body}</p>}
+                  <div className="mt-2 text-xs text-neutral-400">👊 {a.reaction_count} · {a.type}</div>
+                </div>
+              ))}
+              <div className="mt-4 text-xs font-semibold uppercase text-neutral-400">Messages with the gym</div>
+              <div className="space-y-2 rounded-xl bg-white p-3 shadow-sm">
+                {messages.length === 0 && <div className="py-2 text-center text-xs text-neutral-400">No messages yet</div>}
+                {messages.map((m) => {
+                  const fromMe = m.sender_member_id === me?.id;
+                  return (
+                    <div key={m.id} className={`flex ${fromMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[80%] rounded-lg px-3 py-1.5 text-xs ${m.is_broadcast ? "bg-blue-50 text-blue-800" : fromMe ? "bg-brand text-white" : "bg-neutral-100"}`}>
+                        {m.is_broadcast && <div className="text-[10px] font-semibold uppercase opacity-70">📣 {m.sender_name}</div>}
+                        {m.body}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex gap-2 pt-1">
+                  <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Message the gym…" className="flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-xs" />
+                  <button onClick={send} className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white">Send</button>
+                </div>
+              </div>
             </div>
           ) : tab === "myox" ? (
             <div className="space-y-3">
@@ -219,7 +260,7 @@ export default function MemberApp() {
         </div>
 
         <div className="absolute inset-x-0 bottom-0 flex border-t border-neutral-200 bg-white">
-          {([["home", "🏠", "Home"], ["myox", "🔥", "MyOx"], ["qr", "▣", "My QR"], ["more", "⋯", "More"]] as const).map(([key, icon, label]) => (
+          {([["home", "🏠", "Home"], ["community", "💬", "Community"], ["myox", "🔥", "MyOx"], ["qr", "▣", "QR"], ["more", "⋯", "More"]] as const).map(([key, icon, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`flex flex-1 flex-col items-center py-2.5 text-xs ${tab === key ? "font-semibold text-brand" : "text-neutral-400"}`}>
               <span className="text-base">{icon}</span>{label}
