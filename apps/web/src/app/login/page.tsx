@@ -1,15 +1,20 @@
 "use client";
-// Login. Real mode: Supabase magic link (PKCE) → /auth/callback. Demo mode: mock continue button.
-// Signups are disabled project-wide (invite-only), so shouldCreateUser: false.
+// Login. Real mode: Supabase magic link → /auth/confirm (server-side code exchange).
+// Signups disabled project-wide (invite-only), so shouldCreateUser: false.
+// Demo mode: mock continue button.
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { isDemoMode, supabase } from "@/lib/data";
 
 export default function LoginPage() {
+  return <Suspense><LoginInner /></Suspense>;
+}
+
+function LoginInner() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(useSearchParamsError());
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
@@ -25,13 +30,13 @@ export default function LoginPage() {
       email,
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
       },
     });
     setBusy(false);
     if (error) {
       setError(
-        error.message.toLowerCase().includes("signups")
+        error.message.toLowerCase().includes("signup")
           ? "This email doesn't have an account. Accounts are invite-only — contact your gym."
           : error.message,
       );
@@ -46,7 +51,7 @@ export default function LoginPage() {
         <div className="mb-6 text-center">
           <div className="text-3xl">🥊</div>
           <h1 className="mt-2 text-xl font-bold tracking-tight">OxRound</h1>
-          <p className="text-sm text-neutral-500">Gym owner sign-in</p>
+          <p className="text-sm text-neutral-500">Sign in</p>
         </div>
 
         {!sent ? (
@@ -64,7 +69,7 @@ export default function LoginPage() {
               disabled={busy}
               className="w-full rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
             >
-              {busy ? "Sending…" : "Send magic link"}
+              {busy ? "Sending…" : "Email me a sign-in link"}
             </button>
             {error && <p className="rounded-md bg-red-50 p-3 text-center text-xs text-red-700">{error}</p>}
             <p className="text-center text-xs text-neutral-400">No password — we email you a sign-in link.</p>
@@ -72,7 +77,7 @@ export default function LoginPage() {
         ) : (
           <div className="space-y-4 text-center">
             <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-              Magic link sent to <span className="font-semibold">{email}</span>. Check your inbox — open the link on this device.
+              Sign-in link sent to <span className="font-semibold">{email}</span>. Open it in this browser.
             </div>
             {isDemoMode && (
               <button onClick={() => router.push("/")} className="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white">
@@ -89,4 +94,13 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+// Surface an error passed back from /auth/confirm (e.g. expired link).
+function useSearchParamsError(): string | null {
+  const params = useSearchParams();
+  const err = params.get("error");
+  if (!err) return null;
+  if (err === "no_code") return "That sign-in link was incomplete. Request a new one.";
+  return "That link didn't work — it may have expired. Request a new one.";
 }

@@ -5,7 +5,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback"];
+const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback"];
 
 export default async function proxy(req: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,7 +34,7 @@ export default async function proxy(req: NextRequest) {
   // forward them to the callback so the code isn't lost.
   if (!user && req.nextUrl.searchParams.has("code") && !isPublic) {
     const cbUrl = req.nextUrl.clone();
-    cbUrl.pathname = "/auth/callback";
+    cbUrl.pathname = "/auth/confirm";
     return NextResponse.redirect(cbUrl);
   }
 

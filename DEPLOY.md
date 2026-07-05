@@ -114,6 +114,18 @@ Everything above ships a demo. Real G1 data requires:
 - [ ] 6B2. **Per-role tab + action visibility (D-21):** owner/manager = everything; coach = schedule / their classes / rosters / mark attendance / scanner / member contact info — NO payments, plans, settings, reports; receptionist = the coach set + payments/check-in, no settings. One CRM, tabs and buttons shown by role.
 - [ ] 6B3. Add a **Scanner** tab to the CRM nav → the iPad scanner page (6D). Available to owner/manager/coach/receptionist.
 
+### 6F — Messaging + Community + notifications (D-23, spans owner & member)
+- [ ] 6F1. **Community tab** both sides: surface the existing `announcements` feature as a "Community" tab — staff post, members view + react (reactions/read-counts already built).
+- [ ] 6F2. **Messaging** (net-new backend: conversations + messages tables + RLS): staff↔member. Confirm scope first (D-23: default two-way 1:1 + broadcast-to-all).
+- [ ] 6F3. **Notification bell** 🔔 in the top bar of both CRM and member app: carries messages + community posts + **system notifications**. Owner/staff: at-risk member, overdue payment (start here — derived live from existing dashboard analytics, no new infra), new-member-joined, waitlist filled. Member: upcoming class, booking reminder, class cancelled, waitlist opened, membership expiring, payment due (stored events in the `notifications` table). Two styles: derived-from-analytics vs stored-events.
+
+### 6G — Member onboarding lifecycle (D-24)
+- [ ] 6G1. Change member creation: new member = **Invited** (no `user_id`, `memberships` row `payment_status='pending'`), NOT instantly active; QR inactive.
+- [ ] 6G2. Server-side invite: creating a member emails an **activation magic link** (service-role key, server action/Edge Function — never browser). Real member email needs Resend+domain (5.4); test with own emails first.
+- [ ] 6G3. On first login `user_id` populates → **Joined-unpaid**: app browsable, QR blocked (= D-20).
+- [ ] 6G4. Owner records payment → `payment_status='paid'` → **Active**: QR works.
+- [ ] 6G5. Members-tab status column shows real state: Invited / Joined-unpaid / Active / Overdue (comped/staff skip the gate).
+
 ### 6C — Member web app side (`/app`, currently a preview)
 - [ ] 6C1. Gate `/app` behind member login; per-member RLS so each member sees only their own bookings/QR/profile — never other members, never owner data.
 - [ ] 6C2. Wire each preview screen (home, schedule, booking, profile) to the logged-in member's real data (not hardcoded "Marco").

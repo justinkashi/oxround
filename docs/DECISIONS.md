@@ -1,6 +1,6 @@
 # OxRound — Open Decisions & Known Issues
 
-Review this at the start of every session. Resolve decisions before building the affected feature.
+Review this at the start of every session. Resolve decisions before building the affected feature. *Note that when a decision is made, we should not delete it here, we keep it, but we can add a checkmark describing what decision was made* 
 
 **Legend:** 🔴 Blocks launch · 🟡 Blocks Phase 2 · 🟢 Can defer
 
@@ -112,33 +112,70 @@ Review this at the start of every session. Resolve decisions before building the
 ### D-20 · Unpaid members lose QR / check-in access
 
 **Spec (2026-07-04):** a member who isn't paying can't check in. Enforced in TWO layers:
+
 1. **Member app** hides the My QR tab, showing "Membership payment due — see the front desk" (nudge).
 2. **`check-in` function** re-checks payment status at scan time and rejects with red "Payment due ✗" (authoritative — a screenshot of an old QR must still fail, since the QR token is static).
-**Open questions (need G1 input before final rule):**
+   **Open questions (need G1 input before final rule):**
+
 - What counts as "not paying"? Default: `payment_status='overdue'` = blocked; `comped` (staff/free) always exempt; `pending` (new member, first invoice unpaid) — block or allow? TBD.
 - Grace period: block the instant payment is late, or allow N days? Locking a loyal member over a late e-transfer is bad UX — most gyms allow a short grace window. **G1 business decision.**
-**Related:** extends the existing "deactivated membership ⇒ scan rejected" behavior (D-03/check-in fn) from *status* to *payment_status*.
-**Status:** ✅ Spec recorded — grace-period + pending rule pending G1; build with Step 6 (6C3 My QR, 6D scanner).
+  **Related:** extends the existing "deactivated membership ⇒ scan rejected" behavior (D-03/check-in fn) from *status* to *payment_status*.
+  **Status:** ✅ Spec recorded — grace-period + pending rule pending G1; build with Step 6 (6C3 My QR, 6D scanner).
 
 ### D-21 · Coaches (and receptionists) get a role-scoped CRM view, not a separate app
 
 **Spec (2026-07-04):** coaches and receptionists log into the SAME CRM as the owner, but see a restricted set of tabs/actions by role — not a third separate web app. Enforced two layers: UI hides tabs/buttons by role (UX), and RLS/role checks block the data server-side (authoritative — a coach can't reach payments by typing the URL).
 **Default permissions matrix (needs G1 confirmation):**
+
 - `owner` / `manager`: everything.
 - `coach`: view schedule + their assigned classes, class rosters, mark attendance/no-show, run check-in scanner, view member contact info. NO payments, plans, settings, reports, revenue.
 - `receptionist`: coach set + record payments + check-in. NO settings, no revenue reports.
 - `member`: member app only (never the CRM).
-**Why same-app-scoped:** one codebase, one deploy; matches how the roles array + `is_staff()` already work. A separate coach app would triple maintenance for no benefit.
-**Status:** ✅ Approach recorded — exact per-role permissions pending G1; build within Step 6 (6A2 router, 6B2 visibility).
+  **Why same-app-scoped:** one codebase, one deploy; matches how the roles array + `is_staff()` already work. A separate coach app would triple maintenance for no benefit.
+  **Status:** ✅ Approach recorded — exact per-role permissions pending G1; build within Step 6 (6A2 router, 6B2 visibility).
 
 ### D-22 · Member app tab structure — add "MyOx" engagement tab, move Schedule under "More"
 
 **Spec (2026-07-04):** restructure the member web app's bottom nav for retention.
+
 - **New primary tab "MyOx"** — personal analytics + gamification to drive daily return: current streak (🔥 N weeks), visits this month vs last, total-classes milestones/badges, personal bests, motivational nudges ("2 more to beat last week"), opt-in leaderboard (later). Built from check-in data already collected (CRM `attendanceSummaries()` already computes streaks/visits).
 - **Schedule + booking move under a "More"/Settings area** (with Profile, membership, account) — no longer a primary tab.
 - Likely primary tabs become: **Home · MyOx · My QR · More**.
-**UX flag (accepted by product owner):** Schedule is a high-frequency action; burying it may reduce bookings. Mitigation: keep a "Book next class" shortcut on Home even with the full schedule under More.
-**Status:** ✅ Direction recorded — build within Step 6 (member app, 6C). Update the `/app` preview to match when convenient.
+  **UX flag (accepted by product owner):** Schedule is a high-frequency action; burying it may reduce bookings. Mitigation: keep a "Book next class" shortcut on Home even with the full schedule under More.
+  **Status:** ✅ Direction recorded — build within Step 6 (member app, 6C). Update the `/app` preview to match when convenient.
+
+### D-23 · Messaging + Community tab + notification bell
+
+**Spec (2026-07-04):** add member↔gym communication across both apps.
+
+- **Community tab** (both CRM and member app): staff (owner/coach) post; members view + react. This is the existing `announcements` feature (table, reactions, read-counts already built) surfaced as a "Community" tab. Members are read+react only; staff post.
+- **Messaging** (net-new): direct messages between staff and members. **Scope — needs decision:** (1) staff→member one-way, (2) staff↔member two-way 1:1 [recommended for pilot], (3) + broadcast/segments ("all overdue", "Tuesday class"). Default to build: two-way 1:1 + broadcast-to-all.
+- **Notification bell** 🔔 in the top bar of both apps: carries THREE kinds — (1) direct messages, (2) new community posts, (3) **system/automated notifications** (below). Schema already has a `notifications` table + `announcement_reads` scaffolding.
+- **System notifications (role-specific content):**
+  - *Owner/staff CRM:* at-risk member (drop-off), payment overdue, new member joined/activated, waitlist filled, low class capacity. Start with **at-risk + overdue** (data already computed on the dashboard).
+  - *Member app:* class starting soon, booking reminder, class cancelled, waitlist opened, membership expiring, payment due.
+  - *Two implementation styles:* **derived/computed** live from existing analytics (at-risk, overdue — near-zero new work, reuses dashboard logic) vs **stored events** in the `notifications` table (cancellations, bookings, activations).
+    **Permissions:** owner/coach = post to community + send messages; receptionist per D-21; member = view community + react, receive/reply to messages (if two-way).
+    **Relation to existing:** pulls the Phase 3 "community feed (gym-scoped)" and "email blast" ideas forward; the "in-app notification feed" already noted as push fallback becomes this bell.
+    **Open:** two-way vs one-way messaging (owner inbox load); whether members can start a thread or only reply.
+    **Status:** ✅ Recorded — messaging scope pending confirmation; build within Step 6.
+
+### D-24 · Member onboarding lifecycle — invite → join → activate-on-payment
+
+**Spec (2026-07-04):** replace "add member ⇒ instantly active" with a proper lifecycle. Two independent states:
+
+- **Account state** (`gym_members.user_id`): empty = invited/not claimed; set = they logged in.
+- **Membership state** (`memberships.payment_status`): pending = not paying yet; paid = active.
+  **Flow:**
+
+1. Owner adds member in the Members tab (name + email). Member row created as **Invited**: no `user_id`, a `memberships` row with `payment_status='pending'`. NOT fully active. QR does not work yet.
+2. System emails an **activation magic link** to that email (invite-only signup — this IS the invite).
+3. Member clicks link → logs in → `user_id` populated → **Joined-unpaid**: can open + browse the app (schedule, community, profile) but **QR/check-in blocked** (= D-20 payment gate).
+4. Owner records the member's payment (Payments tab) → `payment_status='paid'` → **Active**: QR works, can check in.
+   **Members-tab UI:** show the real state — Invited / Joined-unpaid / Active / Overdue — not just "active".
+   **Dependencies:** (a) emailing real members needs custom SMTP (Resend) + verified domain — same wall as owner invite (5.4); testable with own emails until then. (b) the invite-send runs server-side with the service-role key (net-new small server action / Edge Function) — never in the browser.
+   **Relation:** the QR gating is exactly D-20; comped/staff skip the payment gate.
+   **Status:** ✅ Recorded — build within Step 6 (member onboarding); email step blocked on domain.
 
 ## 🟢 Business / Strategy Decisions (can defer)
 
