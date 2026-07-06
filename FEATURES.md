@@ -11,7 +11,7 @@
 
 - ✅/⬜ **Authentication & role routing:** ✅ real magic-link login (invite-only), server-side code exchange, session guard, logout, **one login → role router (owner/manager→CRM, coach/receptionist→restricted CRM, member→/app), member/staff two-way guard, no-access page** (Step 6A/6B). ⬜ join-via-invite-code.
 - ✅/⬜ **Dashboard:** today's classes, attendance, active members, expiring memberships. ✅ **Live check-in feed (realtime)** and **at-risk member alert** already built. **[added: live feed + at-risk were missing from draft]**
-- ✅/⬜ **Member Management:** ✅ list/search/create/deactivate. ⬜ profile editing, emergency contacts, DOB, medical notes, boxing fields (weight class, skill level, fight record), coach notes, waiver upload, bulk QR card print sheet, **archive = soft-delete only (never hard delete)** **[added]**, **bulk actions** **[added]**, **trial role (walk-in, no booking)** **[added]**, **onboarding lifecycle: add ⇒ Invited (email activation link) ⇒ Joined-unpaid (app access, QR blocked) ⇒ Active on payment confirmation (D-24)** **[added]**.
+- ✅/⬜ **Member Management:** ✅ list/search/create/**edit fields**/deactivate/**archive + restore (soft-delete, undoable)**/**resend app invite**; batched roster query (no N+1); duplicate-email guard; loading/empty/error states. ⬜ emergency contacts, DOB, medical notes, boxing fields (weight class, skill level, fight record), coach notes, waiver upload, bulk QR card print sheet, **bulk actions** **[added]**, **trial role (walk-in, no booking)** **[added]**, **onboarding lifecycle: add ⇒ Invited (email activation link) ⇒ Joined-unpaid (app access, QR blocked) ⇒ Active on payment confirmation (D-24)** **[added]**.
 - ✅/⬜ **Attendance Analytics ("Logs" — core must-have):** ✅ busiest days, per-member trends/streaks, drop-off detection, revenue-at-risk number. ⬜ per-class attendance view. **[added — entire section was missing from draft]**
 - ✅/⬜ **Class Scheduling:** ✅ weekly schedule grid, create class, recurring days, capacity limits, coach assignment, class colors, deactivate class, cancel-session flow. ⬜ edit existing class, **auto-notification to booked members on cancellation** **[added]**.
 - ✅/⬜ **Booking Management:** ✅ per-session rosters, waitlist (auto-waitlist when full + promote), spots remaining, cancel/no-show/attended marking, book member from CRM. ⬜ **no-show fees — automated penalty logic (needs G1 decision)** **[added]**, **automatic `attended` reconciliation when a booked member checks in** **[added]**.
@@ -49,6 +49,7 @@
 
 ### Infrastructure & Compliance (Phase 1, invisible but required) **[added — section missing from draft]**
 
+- ✅ **backend RLS workflow tests** (pgTAP — `supabase/tests/rls_workflows.test.sql`, run via `supabase test db`): every write path asserted allowed-for-staff / denied-for-members, so demo-vs-real gaps are caught before shipping.
 - ⬜ Notification queue with retry · membership-expiry cron + silent-failure alerting · CI/CD pipeline · staging environment · error monitoring · uptime checks · verified backups · privacy policy + 72 h breach procedure + Supabase DPA (Law 25) · i18n scaffolding day 1 (strings English-only) · onboarding email sequence with app-store deep links · "app day" activation playbook.
 
 ---

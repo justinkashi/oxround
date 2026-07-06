@@ -2,9 +2,11 @@
 // Owner/staff calls this after creating a member → emails an activation link (via Resend SMTP)
 // and links the new auth user to the existing gym_members row by email.
 //
-// Auth model: this function AUTHENTICATES ITS OWN CALLER (getUser + staff-role check),
-// so it is deployed with verify_jwt = FALSE. Leaving the gateway verify_jwt gate ON caused
-// silent 401s before the body ran (no logs, no email) — that was the "non-2xx" bug.
+// Auth model: self-authenticating, deployed with verify_jwt = FALSE.
+//   1. Validate the caller's token with getUser(token) — proves it's a genuine, unexpired user.
+//   2. Read roles + gym_id from the token's claims (the custom access token hook injects them).
+//      This avoids a fragile service-role lookup that was returning empty and 403-ing owners.
+//      Falls back to a DB lookup only if the token predates the hook.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -16,10 +18,20 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
+function claimsFromToken(token: string): { roles: string[]; gymId: string | null } {
+  try {
+    const p = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return { roles: Array.isArray(p.roles) ? p.roles : [], gymId: (p.gym_id as string) ?? null };
+  } catch {
+    return { roles: [], gymId: null };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { email } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const email = String(body?.email ?? "").trim().toLowerCase();
     if (!email) return json({ error: "email required" }, 400);
 
     const url = Deno.env.get("SUPABASE_URL");
@@ -30,26 +42,36 @@ Deno.serve(async (req) => {
       return json({ error: "server misconfigured (missing keys)" }, 500);
     }
 
-    // Verify the caller is authenticated staff (self-auth; gateway verify_jwt is off).
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader) return json({ error: "sign in again and retry" }, 401);
-    const userClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: { user }, error: userErr } = await userClient.auth.getUser();
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (!token) return json({ error: "sign in again and retry" }, 401);
+
+    // Validate the token (genuine, unexpired user).
+    const userClient = createClient(url, anonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+    const { data: { user }, error: userErr } = await userClient.auth.getUser(token);
     if (userErr || !user) return json({ error: "sign in again and retry" }, 401);
 
     const admin = createClient(url, serviceKey);
-    const { data: caller } = await admin.from("gym_members").select("roles, gym_id").eq("user_id", user.id).maybeSingle();
-    const staffRoles = ["owner", "manager", "coach", "receptionist"];
-    if (!caller || !(caller.roles as string[]).some((r) => staffRoles.includes(r))) {
-      return json({ error: "only staff can send invites" }, 403);
+
+    // Staff check from the signed token's claims; DB fallback only if claims are absent.
+    let { roles, gymId } = claimsFromToken(token);
+    if (!roles.length || !gymId) {
+      const { data: caller } = await admin.from("gym_members").select("roles, gym_id").eq("user_id", user.id).maybeSingle();
+      if (caller) {
+        if (!roles.length) roles = (caller.roles as string[]) ?? [];
+        if (!gymId) gymId = (caller.gym_id as string) ?? null;
+      }
     }
 
-    // The member row must already exist in the caller's gym (created by the owner).
+    const staffRoles = ["owner", "manager", "coach", "receptionist"];
+    if (!roles.some((r) => staffRoles.includes(r))) return json({ error: "only staff can send invites" }, 403);
+    if (!gymId) return json({ error: "your account isn't linked to a gym — sign out and back in" }, 400);
+
+    // The member row must already exist in the caller's gym (created by the owner). Emails are stored lowercased.
     const { data: member } = await admin
       .from("gym_members")
       .select("id, user_id, gym_id")
       .eq("email", email)
-      .eq("gym_id", caller.gym_id)
+      .eq("gym_id", gymId)
       .maybeSingle();
     if (!member) return json({ error: "add the member first — no member with that email in your gym" }, 404);
 
@@ -62,7 +84,7 @@ Deno.serve(async (req) => {
       const already = /already|registered|exists|taken/i.test(error.message);
       if (already) {
         const { data: list } = await admin.auth.admin.listUsers();
-        const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === String(email).toLowerCase());
+        const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
         if (existing && !member.user_id) {
           await admin.from("gym_members").update({ user_id: existing.id }).eq("id", member.id);
         }

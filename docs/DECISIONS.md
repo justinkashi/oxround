@@ -1,12 +1,12 @@
 # OxRound — Open Decisions & Known Issues
 
-Review this at the start of every session. Resolve decisions before building the affected feature. *Note that when a decision is made, we should not delete it here, we keep it, but we can add a checkmark describing what decision was made* 
+Review this at the start of every session. Resolve decisions before building the affected feature. *Note that when a decision is made, we should not delete it here, we keep it, but we can add a checkmark describing what decision was made*
 
 **Legend:** 🔴 Blocks launch · 🟡 Blocks Phase 2 · 🟢 Can defer
 
 ---
 
-## 🔴 Critical Security Issues (fix before G1 pilot)
+[github.com/twentyhq/twenty](https://github.com/twentyhq/twenty)## 🔴 Critical Security Issues (fix before G1 pilot)
 
 ### D-01 · Kiosk auth — service role key is a critical flaw
 
@@ -121,7 +121,7 @@ Review this at the start of every session. Resolve decisions before building the
 - Grace period: block the instant payment is late, or allow N days? Locking a loyal member over a late e-transfer is bad UX — most gyms allow a short grace window. **G1 business decision.**
   **Related:** extends the existing "deactivated membership ⇒ scan rejected" behavior (D-03/check-in fn) from *status* to *payment_status*.
   **RESOLVED (2026-07-04):** there IS a grace period (avoid locking a loyal member over a late e-transfer). During grace, the member keeps QR access, but the **owner is notified** — a small callout/textbox in the CRM's notification area flags "X is past due (in grace until DATE)" so the owner can act. After grace expires unpaid → QR blocked (app hides + scanner rejects). `comped`/staff always exempt. Exact grace length = G1 business input (default 7 days).
-**Status:** ✅ Resolved — grace period + owner notification; build with Step 6 (6C3, 6D, 6F3 bell).
+  **Status:** ✅ Resolved — grace period + owner notification; build with Step 6 (6C3, 6D, 6F3 bell).
 
 ### D-21 · Coaches (and receptionists) get a role-scoped CRM view, not a separate app
 
@@ -176,7 +176,7 @@ Review this at the start of every session. Resolve decisions before building the
    **Dependencies:** (a) emailing real members needs custom SMTP (Resend) + verified domain — same wall as owner invite (5.4); testable with own emails until then. (b) the invite-send runs server-side with the service-role key (net-new small server action / Edge Function) — never in the browser.
    **Relation:** the QR gating is exactly D-20; comped/staff skip the payment gate.
    **RESOLVED (2026-07-04):** an invited member who logs in DOES get app access (browse schedule/community/profile) but their status is **inactive with no QR set up** until the owner confirms payment — then they become active and the QR works. Matches D-20.
-**Status:** ✅ Resolved — build within Step 6 (member onboarding); email step blocked on domain.
+   **Status:** ✅ Resolved — build within Step 6 (member onboarding); email step blocked on domain.
 
 ## 🟢 Business / Strategy Decisions (can defer)
 

@@ -145,6 +145,60 @@ export async function setMemberStatus(memberId: string, status: GymMember["statu
   await supabase().from("gym_members").update({ status }).eq("id", memberId);
 }
 
+// Edit a member's contact fields (owner-only per RLS members_owner_update). Emails stored lowercased.
+export async function updateMember(
+  id: string,
+  fields: { first_name: string; last_name: string; email: string; phone: string },
+): Promise<void> {
+  const clean = {
+    first_name: fields.first_name.trim(),
+    last_name: fields.last_name?.trim() || null,
+    email: fields.email?.trim().toLowerCase() || null,
+    phone: fields.phone?.trim() || null,
+  };
+  if (!clean.first_name) throw new Error("First name is required.");
+  if (isDemoMode) {
+    const m = state.members.find((x) => x.id === id);
+    if (m) Object.assign(m, clean);
+    return;
+  }
+  const { error } = await supabase().from("gym_members").update(clean).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function listArchivedMembers(): Promise<GymMember[]> {
+  if (isDemoMode) return state.members.filter((m) => m.status === "archived");
+  const { data, error } = await supabase().from("gym_members").select("*").eq("status", "archived").order("first_name");
+  if (error) throw new Error(error.message);
+  return data as GymMember[];
+}
+
+export type MemberWithMembership = { member: GymMember; membership: Membership | null };
+
+// One batched query — replaces the N+1 where each member's membership was fetched separately.
+export async function listMembersWithMemberships(): Promise<MemberWithMembership[]> {
+  if (isDemoMode) {
+    return state.members
+      .filter((m) => m.status !== "archived")
+      .map((member) => ({ member, membership: state.memberships.find((s) => s.gym_member_id === member.id) ?? null }));
+  }
+  const { data, error } = await supabase()
+    .from("gym_members")
+    .select("*, memberships(*, membership_plans(name))")
+    .neq("status", "archived")
+    .order("first_name");
+  if (error) throw new Error(error.message);
+  return (data as Array<Record<string, unknown>>).map((row) => {
+    const { memberships, ...rest } = row as Record<string, unknown> & { memberships?: Array<Record<string, unknown>> };
+    const list = (memberships ?? []) as Array<Record<string, unknown> & { status?: string; membership_plans?: { name: string } }>;
+    const active = list.find((s) => s.status === "active") ?? list[0] ?? null;
+    const membership = active
+      ? { ...(active as unknown as Membership), plan_name: active.membership_plans?.name ?? "—" }
+      : null;
+    return { member: rest as unknown as GymMember, membership };
+  });
+}
+
 export async function createMember(
   input: { first_name: string; last_name: string; email: string; phone: string; role?: "member" | "coach" },
 ): Promise<GymMember> {
@@ -153,10 +207,13 @@ export async function createMember(
   const fields = {
     first_name: input.first_name.trim(),
     last_name: input.last_name?.trim() || null,
-    email: input.email?.trim() || null,
+    email: input.email?.trim().toLowerCase() || null,
     phone: input.phone?.trim() || null,
   };
   if (isDemoMode) {
+    if (fields.email && state.members.some((m) => m.status !== "archived" && m.email === fields.email)) {
+      throw new Error("A member with that email already exists.");
+    }
     const m: GymMember = {
       id: `m${Date.now()}`, gym_id: "g1", roles: [role], status: "active",
       joined_at: new Date().toISOString().slice(0, 10), emergency_contact: null,
@@ -171,6 +228,11 @@ export async function createMember(
   }
   const gymId = await getMyGymId();
   if (!gymId) throw new Error("Could not determine your gym. Log out and back in.");
+  if (fields.email) {
+    const { data: dupe } = await supabase().from("gym_members")
+      .select("id").eq("gym_id", gymId).eq("email", fields.email).neq("status", "archived").maybeSingle();
+    if (dupe) throw new Error("A member with that email already exists.");
+  }
   // Real mode: raw token generated client-side ONCE for the QR; only SHA-256 stored (D-02).
   const raw = crypto.randomUUID() + crypto.randomUUID();
   const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
@@ -206,7 +268,7 @@ export async function createMembersBulk(input: BulkMemberInput[]): Promise<BulkI
     .map((r) => ({
       first_name: (r.first_name ?? "").trim(),
       last_name: (r.last_name ?? "").trim(),
-      email: (r.email ?? "").trim(),
+      email: (r.email ?? "").trim().toLowerCase(),
       phone: (r.phone ?? "").trim(),
     }))
     .filter((r) => r.first_name.length > 0);

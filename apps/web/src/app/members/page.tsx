@@ -3,35 +3,52 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createMember, createMembersBulk, getMembership, inviteMemberEmail, listMembers, type BulkMemberInput } from "@/lib/data";
-import type { GymMember, Membership } from "@/lib/types";
+import {
+  createMember, createMembersBulk, inviteMemberEmail, listArchivedMembers,
+  listMembersWithMemberships, setMemberStatus, updateMember,
+  type BulkMemberInput, type MemberWithMembership,
+} from "@/lib/data";
+import type { GymMember } from "@/lib/types";
 
 function errText(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (err && typeof err === "object" && "message" in err) return String((err as { message: unknown }).message);
-  return "Could not add — please try again.";
+  return "Something went wrong — please try again.";
 }
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<GymMember[]>([]);
-  const [memberships, setMemberships] = useState<Record<string, Membership | null>>({});
+  const [rows, setRows] = useState<MemberWithMembership[]>([]);
+  const [archived, setArchived] = useState<GymMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [editing, setEditing] = useState<GymMember | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "member" as "member" | "coach" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = async () => {
-    const ms = await listMembers();
-    setMembers(ms);
-    const entries = await Promise.all(ms.map(async (m) => [m.id, await getMembership(m.id)] as const));
-    setMemberships(Object.fromEntries(entries));
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [ms, arch] = await Promise.all([listMembersWithMemberships(), listArchivedMembers()]);
+      setRows(ms);
+      setArchived(arch);
+    } catch (e) {
+      setLoadError(errText(e));
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, []);
 
-  const filtered = members.filter((m) =>
+  const filtered = rows.filter(({ member: m }) =>
     `${m.first_name} ${m.last_name ?? ""} ${m.email ?? ""}`.toLowerCase().includes(q.toLowerCase()),
   );
 
@@ -47,9 +64,9 @@ export default function MembersPage() {
         const r = await inviteMemberEmail(form.email);
         setNotice(r.ok
           ? `${form.first_name} added ✓ — app invite sent to ${form.email}.`
-          : `${form.first_name} added ✓. The app invite didn't send (${r.error}) — you can resend it later; it doesn't affect their membership.`);
+          : `${form.first_name} added ✓. Invite not sent yet (${r.error}) — use “Resend invite” on their row anytime; it doesn't affect their membership.`);
       } else {
-        setNotice(`${form.first_name} added ✓. No email on file, so no app invite yet — add one on their profile to invite them.`);
+        setNotice(`${form.first_name} added ✓. No email on file, so no app invite yet — add one via Edit to invite them.`);
       }
       setForm({ first_name: "", last_name: "", email: "", phone: "", role: "member" });
       setShowForm(false);
@@ -59,6 +76,52 @@ export default function MembersPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const saveEdit = async (fields: { first_name: string; last_name: string; email: string; phone: string }) => {
+    if (!editing) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      await updateMember(editing.id, fields);
+      setNotice(`${fields.first_name} updated ✓.`);
+      setEditing(null);
+      load();
+    } catch (err) {
+      setEditError(errText(err));
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const archive = async (m: GymMember) => {
+    if (!window.confirm(`Archive ${m.first_name} ${m.last_name ?? ""}?\nThey leave your active list but are NOT deleted — restore them anytime from “Show archived”.`)) return;
+    setError(null);
+    try {
+      await setMemberStatus(m.id, "archived");
+      setNotice(`${m.first_name} archived.`);
+      load();
+    } catch (err) {
+      setError(errText(err));
+    }
+  };
+
+  const restore = async (m: GymMember) => {
+    setError(null);
+    try {
+      await setMemberStatus(m.id, "active");
+      setNotice(`${m.first_name} restored to your active list.`);
+      load();
+    } catch (err) {
+      setError(errText(err));
+    }
+  };
+
+  const resend = async (m: GymMember) => {
+    if (!m.email) { setNotice(`${m.first_name} has no email — add one via Edit first.`); return; }
+    setNotice(`Sending invite to ${m.email}…`);
+    const r = await inviteMemberEmail(m.email);
+    setNotice(r.ok ? `Invite sent to ${m.email} ✓.` : `Couldn't send invite to ${m.email}: ${r.error}`);
   };
 
   return (
@@ -76,10 +139,11 @@ export default function MembersPage() {
       </div>
 
       {notice && <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800">{notice}</div>}
+      {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {showImport && (
         <ImportCsv
-          existingEmails={new Set(members.map((m) => (m.email ?? "").toLowerCase()).filter(Boolean))}
+          existingEmails={new Set(rows.map(({ member: m }) => (m.email ?? "").toLowerCase()).filter(Boolean))}
           onDone={(msg) => { setNotice(msg); setShowImport(false); load(); }}
         />
       )}
@@ -102,33 +166,48 @@ export default function MembersPage() {
             <option value="coach">Coach</option>
           </select>
           <button type="submit" disabled={busy} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy ? "Adding…" : "Create"}</button>
-          {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700 sm:col-span-2 md:col-span-6">{error}</p>}
           <p className="text-xs text-neutral-400 sm:col-span-2 md:col-span-6">Member → gets the member app. Coach → gets the CRM (restricted). An invite email is sent if you provide one.</p>
         </form>
       )}
 
-      <input
-        placeholder="Search members…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        className="mb-4 w-full max-w-sm rounded-md border border-neutral-300 px-3 py-2 text-sm"
-      />
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <input
+          placeholder="Search members…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="w-full max-w-sm rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        />
+        <button onClick={() => setShowArchived(!showArchived)} className="whitespace-nowrap text-sm text-neutral-500 hover:text-brand">
+          {showArchived ? "Hide archived" : `Show archived${archived.length ? ` (${archived.length})` : ""}`}
+        </button>
+      </div>
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
-            <tr>
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Plan</th>
-              <th className="px-4 py-2">Payment</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Joined</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((m) => {
-              const s = memberships[m.id];
-              return (
+      {loading ? (
+        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-500">Loading members…</p>
+      ) : loadError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Couldn&apos;t load members: {loadError}
+          <button onClick={load} className="ml-2 font-medium underline">Retry</button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+          {q ? "No members match your search." : "No members yet — add your first one, or import a CSV."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
+              <tr>
+                <th className="px-4 py-2">Name</th>
+                <th className="px-4 py-2">Plan</th>
+                <th className="px-4 py-2">Payment</th>
+                <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">Joined</th>
+                <th className="px-4 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(({ member: m, membership: s }) => (
                 <tr key={m.id} className="border-t border-neutral-100 hover:bg-neutral-50">
                   <td className="px-4 py-2">
                     <Link href={`/members/view?id=${m.id}`} className="font-medium text-brand hover:underline">
@@ -140,11 +219,82 @@ export default function MembersPage() {
                   <td className="px-4 py-2"><PaymentBadge status={s?.payment_status} /></td>
                   <td className="px-4 py-2">{m.status}</td>
                   <td className="px-4 py-2 text-neutral-500">{m.joined_at ?? "—"}</td>
+                  <td className="whitespace-nowrap px-4 py-2 text-right">
+                    <button onClick={() => { setEditing(m); setEditError(null); }} className="text-xs font-medium text-neutral-600 hover:text-brand">Edit</button>
+                    <button onClick={() => resend(m)} className="ml-3 text-xs font-medium text-neutral-600 hover:text-brand">Resend invite</button>
+                    <button onClick={() => archive(m)} className="ml-3 text-xs font-medium text-red-600 hover:underline">Archive</button>
+                  </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showArchived && (
+        <div className="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+          <h2 className="mb-2 text-sm font-semibold text-neutral-600">Archived ({archived.length})</h2>
+          {archived.length === 0 ? (
+            <p className="text-xs text-neutral-400">No archived members.</p>
+          ) : archived.map((m) => (
+            <div key={m.id} className="flex items-center justify-between border-b border-neutral-200 py-1.5 text-sm last:border-0">
+              <span>{m.first_name} {m.last_name} {m.email && <span className="text-neutral-400">· {m.email}</span>}</span>
+              <button onClick={() => restore(m)} className="text-xs font-medium text-green-700 hover:underline">Restore</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <EditMemberModal
+          member={editing}
+          busy={editBusy}
+          error={editError}
+          onCancel={() => setEditing(null)}
+          onSave={saveEdit}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditMemberModal({ member, busy, error, onSave, onCancel }: {
+  member: GymMember;
+  busy: boolean;
+  error: string | null;
+  onSave: (f: { first_name: string; last_name: string; email: string; phone: string }) => void;
+  onCancel: () => void;
+}) {
+  const [f, setF] = useState({
+    first_name: member.first_name,
+    last_name: member.last_name ?? "",
+    email: member.email ?? "",
+    phone: member.phone ?? "",
+  });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-4 text-lg font-bold">Edit member</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {(["first_name", "last_name", "email", "phone"] as const).map((k) => (
+            <div key={k} className={k === "email" || k === "phone" ? "sm:col-span-2" : ""}>
+              <label className="mb-1 block text-xs font-medium uppercase text-neutral-500">
+                {k.replace("_", " ")}{k === "phone" || k === "email" ? " (optional)" : ""}
+              </label>
+              <input
+                type={k === "email" ? "email" : "text"}
+                value={f[k]}
+                onChange={(e) => setF({ ...f, [k]: e.target.value })}
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+        {error && <p className="mt-3 rounded-md bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onCancel} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">Cancel</button>
+          <button disabled={busy || !f.first_name.trim()} onClick={() => onSave(f)} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50">{busy ? "Saving…" : "Save changes"}</button>
+        </div>
       </div>
     </div>
   );
