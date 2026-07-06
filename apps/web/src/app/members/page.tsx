@@ -46,10 +46,10 @@ export default function MembersPage() {
       if (form.email) {
         const r = await inviteMemberEmail(form.email);
         setNotice(r.ok
-          ? `${form.first_name} added — invite emailed to ${form.email}.`
-          : `${form.first_name} added, but the invite email didn't send (${r.error}). Deploy the invite function or invite them from Supabase.`);
+          ? `${form.first_name} added ✓ — app invite sent to ${form.email}.`
+          : `${form.first_name} added ✓. The app invite didn't send (${r.error}) — you can resend it later; it doesn't affect their membership.`);
       } else {
-        setNotice(`${form.first_name} added (no email — they can't get an app invite until you add one).`);
+        setNotice(`${form.first_name} added ✓. No email on file, so no app invite yet — add one on their profile to invite them.`);
       }
       setForm({ first_name: "", last_name: "", email: "", phone: "", role: "member" });
       setShowForm(false);

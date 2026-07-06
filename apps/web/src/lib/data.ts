@@ -475,7 +475,18 @@ async function currentMemberId(): Promise<string | null> {
 export async function inviteMemberEmail(email: string): Promise<{ ok: boolean; error?: string }> {
   if (isDemoMode) return { ok: true };
   const { data, error } = await supabase().functions.invoke("invite-member", { body: { email } });
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // supabase-js wraps a non-2xx as a generic message; the real reason is in the response body.
+    let detail = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.json === "function") {
+        const body = await ctx.json();
+        if (body?.error) detail = body.error as string;
+      }
+    } catch { /* keep the generic message */ }
+    return { ok: false, error: detail };
+  }
   if (data?.error) return { ok: false, error: data.error };
   return { ok: true };
 }
