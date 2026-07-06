@@ -188,6 +188,68 @@ export async function createMember(
   return member;
 }
 
+export type BulkMemberInput = { first_name: string; last_name?: string; email?: string; phone?: string };
+export type BulkImportResult = { created: number; errors: string[] };
+
+// Bulk-create members from a spreadsheet import (CSV wizard). Mirrors createMember:
+// each real member gets a SHA-256 check-in token hash + a pending membership (D-24/D-20).
+// Invites are NOT auto-sent here — the import UI offers that as an opt-in.
+export async function createMembersBulk(input: BulkMemberInput[]): Promise<BulkImportResult> {
+  const rows = input
+    .map((r) => ({
+      first_name: (r.first_name ?? "").trim(),
+      last_name: (r.last_name ?? "").trim(),
+      email: (r.email ?? "").trim(),
+      phone: (r.phone ?? "").trim(),
+    }))
+    .filter((r) => r.first_name.length > 0);
+  const result: BulkImportResult = { created: 0, errors: [] };
+  if (rows.length === 0) return result;
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (isDemoMode) {
+    for (const r of rows) {
+      const id = `m${Date.now()}${Math.floor(Math.random() * 1e4)}`;
+      state.members.push({
+        id, gym_id: "g1", roles: ["member"], status: "active", joined_at: today,
+        emergency_contact: null, first_name: r.first_name, last_name: r.last_name || null,
+        email: r.email || null, phone: r.phone || null,
+      });
+      state.memberships.push({
+        id: `s${id}`, gym_member_id: id, plan_name: "—", status: "active",
+        payment_status: "pending", payment_method: null, start_date: today, next_billing_date: null,
+      });
+      result.created++;
+    }
+    return result;
+  }
+
+  const gymId = await getMyGymId();
+  if (!gymId) throw new Error("Could not determine your gym. Log out and back in.");
+  const memberRows = await Promise.all(rows.map(async (r) => {
+    const raw = crypto.randomUUID() + crypto.randomUUID();
+    const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+    const hash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    return {
+      gym_id: gymId, roles: ["member"], check_in_token_hash: hash,
+      first_name: r.first_name, last_name: r.last_name || null,
+      email: r.email || null, phone: r.phone || null,
+    };
+  }));
+  const { data, error } = await supabase().from("gym_members").insert(memberRows).select("id");
+  if (error) throw error;
+  const ids = (data as { id: string }[]).map((d) => d.id);
+  result.created = ids.length;
+  if (ids.length) {
+    const membershipRows = ids.map((id) => ({
+      gym_id: gymId, gym_member_id: id, status: "active", payment_status: "pending", start_date: today,
+    }));
+    const { error: mErr } = await supabase().from("memberships").insert(membershipRows);
+    if (mErr) result.errors.push(`Members added, but their memberships didn't: ${mErr.message}`);
+  }
+  return result;
+}
+
 export async function listCheckIns(limit = 20): Promise<CheckIn[]> {
   if (isDemoMode) return state.checkIns.slice(0, limit);
   const { data, error } = await supabase()

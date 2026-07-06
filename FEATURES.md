@@ -22,7 +22,7 @@
 - ✅/⬜ **Messaging + Community + notifications (D-23):** ✅ **Community** tab (member app feed + CRM announcements = "Community" nav); ✅ **two-way messaging** staff↔member 1:1 + staff **broadcast** to all (new `messages` table + RLS, migration 0005; CRM `/messages` page, member app Community tab thread); ✅ **owner notification bell** 🔔 (at-risk + overdue, derived). ⬜ member-side push/notification bell; message-unread counts on the bell.
 - ✅/⬜ **Settings & Customization:** ✅ business info, operating hours, cancellation policy. ⬜ gym logo upload, kiosk management (QR rotation + kiosk JWT minting — D-01), **feature flags per gym** **[added]**.
 - ✅/⬜ **Reports:** ✅ revenue by month + by method, popular classes, member counts, at-risk count, attendance leaderboard, payments CSV export. ⬜ coach attendance, renewals report, **birthday reminders (Amir nice-to-have)** **[added]**.
-- ✅/⬜ **Operational Back-ups:** ✅ manual check-in override. ⬜ Type-B CSV import wizard, Law 25 tools (data download, PII anonymization).
+- ✅/⬜ **Operational Back-ups:** ✅ manual check-in override, **CSV import wizard** (bulk member migration on the Members page — header auto-map EN/FR, order-fallback with no header, dedupe by email, optional bulk invite). ⬜ Law 25 tools (data download, PII anonymization).
 
 ### QR Check-In System (the #1 must-have — its own section) **[added: draft had only the kiosk screen]**
 

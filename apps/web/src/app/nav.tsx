@@ -72,7 +72,7 @@ function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-72 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
+        <div className="absolute right-0 z-50 mt-1 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-neutral-200 bg-white p-2 shadow-lg md:right-auto md:left-0">
           <div className="px-2 py-1 text-xs font-semibold uppercase text-neutral-400">Alerts</div>
           {items.length === 0 && <div className="px-2 py-3 text-center text-xs text-neutral-400">All clear 🎉</div>}
           {items.map((n) => (

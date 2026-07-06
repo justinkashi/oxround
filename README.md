@@ -9,7 +9,7 @@
 
 > **Update this block + flip ✅/⬜ marks in FEATURES.md after every work session. Nothing else needs updating.**
 
-- **Phase:** DEPLOYED (free tier, demo mode). Live at the Vercel URL; Supabase project `oxround` in ca-central-1 with all 3 migrations, token hook, buckets, email provider configured. No env vars on Vercel yet — site intentionally runs demo mode until real auth exists.
+- **Phase:** LIVE (real auth in production). Supabase project `oxround` (ref `ymhbsvjqklqtfcitonzs`, ca-central-1): all 6 migrations applied, edge functions `check-in` + `auth-hook` + `invite-member` all ACTIVE, token hook + buckets + Resend SMTP configured. Magic-link login works end-to-end; the owner lands in the real CRM. NOTE: "demo mode" is only the automatic fallback that kicks in when `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` are unset (e.g. running `pnpm dev` locally with no `.env`) — it is NOT the state of the deployed site.
 - **Built:** full clickable CRM (dashboard/live feed/at-risk, members, classes grid + rosters + waitlist, attendance, payments, plans, leads Kanban, coaches, announcements, reports+CSV, settings, mock login) + member-app preview at `/app` + responsive pass (mobile nav, stacking layouts, scrollable tables — desktop unchanged).
 - **DEPLOY.md status:** Steps 1–3 ✅, 4.5 (2FA) ✅, 5.1 (real auth CODE) ✅ built & verified — magic-link login, session guard (`apps/web/src/proxy.ts`), logout, `/auth/callback`, owner bootstrap SQL at `supabase/bootstrap-owner.sql`. Pending: 4.0 domain purchase (Resend prerequisite), 5.2–5.8 (config + owner onboarding).
 - **AUTH LIVE (2026-07-05):** real magic-link login working end-to-end on production — owner logs in, lands in real (empty) CRM. Domain `oxround.com` on Cloudflare; `app.oxround.com`→Vercel (propagating); Resend verified, Supabase SMTP live (emails send from no-reply@oxround.com, 30/hr).
@@ -19,7 +19,7 @@
 - **TO DEPLOY:** `git push` (code + migration files), then `supabase functions deploy invite-member` and `supabase secrets set APP_URL=<your vercel/app url>`.
 - **Decided not yet built (D-19/D-21):** ONE login routes by role — owner/manager→full CRM, coach/receptionist→restricted CRM view (same app), member→`/app` web app; CRM gets a Scanner tab, member app gets a My QR tab; full end-to-end QR check-in. Native apps later. Full checklist = DEPLOY.md Step 6.
 - **Accounts ready:** Sentry ✅ + Resend ✅ made (wiring in DEPLOY 5.4 + 5.9). Domain still to buy.
-- **Last updated:** 2026-07-05 (login page redesigned: Member/Coach/Owner tabs — cosmetic only, server still routes by real role).
+- **Last updated:** 2026-07-05 (Members: CSV bulk-import wizard added; notification-bell dropdown no longer clips on desktop; Phase note corrected — production is real auth, not demo. Confirmed live: 6 migrations applied + invite-member ACTIVE, so adding a member auto-provisions the login + emails the activation link, no Supabase console needed. Prior: login page Member/Coach/Owner tabs — cosmetic, server routes by real role.)
 
 **The direction in one sentence:** finish making both products fully clickable on your laptop for free, use that to win G1, then pay to put it online.
 

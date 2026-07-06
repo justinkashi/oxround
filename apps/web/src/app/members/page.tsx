@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createMember, getMembership, inviteMemberEmail, listMembers } from "@/lib/data";
+import { createMember, createMembersBulk, getMembership, inviteMemberEmail, listMembers, type BulkMemberInput } from "@/lib/data";
 import type { GymMember, Membership } from "@/lib/types";
 
 export default function MembersPage() {
@@ -11,6 +11,7 @@ export default function MembersPage() {
   const [memberships, setMemberships] = useState<Record<string, Membership | null>>({});
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "member" as "member" | "coach" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,12 +59,24 @@ export default function MembersPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Members</h1>
-        <button onClick={() => setShowForm(!showForm)} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-          + Add member
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => { setShowImport(!showImport); setShowForm(false); }} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+            Import CSV
+          </button>
+          <button onClick={() => { setShowForm(!showForm); setShowImport(false); }} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+            + Add member
+          </button>
+        </div>
       </div>
 
       {notice && <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800">{notice}</div>}
+
+      {showImport && (
+        <ImportCsv
+          existingEmails={new Set(members.map((m) => (m.email ?? "").toLowerCase()).filter(Boolean))}
+          onDone={(msg) => { setNotice(msg); setShowImport(false); load(); }}
+        />
+      )}
 
       {showForm && (
         <form onSubmit={submit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2 md:grid-cols-6">
@@ -140,4 +153,161 @@ function PaymentBadge({ status }: { status?: string }) {
     comped: "bg-neutral-100 text-neutral-600",
   };
   return <span className={`rounded px-2 py-0.5 text-xs font-medium ${colors[status]}`}>{status}</span>;
+}
+
+// ---- CSV import (bulk member migration) ----
+
+// Minimal CSV parser: handles quoted fields, escaped quotes, and \r\n.
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== "\r") field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim().length));
+}
+
+// Map parsed rows to members. Recognizes header names (EN/FR) in any order;
+// with no header, assumes first_name, last_name, email, phone. Splits a single "name" column.
+function rowsToMembers(rows: string[][]): { members: BulkMemberInput[]; bodyCount: number } {
+  if (!rows.length) return { members: [], bodyCount: 0 };
+  const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const header = rows[0].map(norm);
+  const looksHeader = header.some((h) =>
+    h.includes("name") || h.includes("email") || h.includes("courriel") || h.includes("phone") ||
+    h.includes("tel") || h === "nom" || h === "prenom" || h === "prénom");
+  const col = { first: -1, last: -1, name: -1, email: -1, phone: -1 };
+  if (looksHeader) header.forEach((h, i) => {
+    if (col.email < 0 && (h.includes("email") || h.includes("courriel"))) col.email = i;
+    else if (col.phone < 0 && (h.includes("phone") || h.includes("tel") || h.includes("mobile"))) col.phone = i;
+    else if (col.first < 0 && (h.includes("first") || h === "prenom" || h === "prénom")) col.first = i;
+    else if (col.last < 0 && (h.includes("last") || h === "nom" || h.includes("surname"))) col.last = i;
+    else if (col.name < 0 && (h === "name" || h === "fullname")) col.name = i;
+  });
+  const body = looksHeader ? rows.slice(1) : rows;
+  const members = body.map((r) => {
+    if (!looksHeader) return { first_name: r[0] ?? "", last_name: r[1] ?? "", email: r[2] ?? "", phone: r[3] ?? "" };
+    let first = col.first >= 0 ? (r[col.first] ?? "") : "";
+    let last = col.last >= 0 ? (r[col.last] ?? "") : "";
+    if (col.first < 0 && col.name >= 0) {
+      const parts = (r[col.name] ?? "").trim().split(/\s+/);
+      first = parts.shift() ?? "";
+      last = parts.join(" ");
+    }
+    return {
+      first_name: first, last_name: last,
+      email: col.email >= 0 ? (r[col.email] ?? "") : "",
+      phone: col.phone >= 0 ? (r[col.phone] ?? "") : "",
+    };
+  }).filter((m) => (m.first_name ?? "").trim().length);
+  return { members, bodyCount: body.length };
+}
+
+function ImportCsv({ existingEmails, onDone }: { existingEmails: Set<string>; onDone: (msg: string) => void }) {
+  const [rows, setRows] = useState<BulkMemberInput[]>([]);
+  const [stats, setStats] = useState<{ dupes: number; skipped: number } | null>(null);
+  const [invite, setInvite] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const ingest = (text: string) => {
+    setErr(null);
+    if (!text.trim()) { setRows([]); setStats(null); return; }
+    const { members, bodyCount } = rowsToMembers(parseCSV(text));
+    const seen = new Set<string>();
+    let dupes = 0;
+    const kept: BulkMemberInput[] = [];
+    for (const m of members) {
+      const key = (m.email ?? "").trim().toLowerCase();
+      if (key && (existingEmails.has(key) || seen.has(key))) { dupes++; continue; }
+      if (key) seen.add(key);
+      kept.push(m);
+    }
+    setRows(kept);
+    setStats({ dupes, skipped: bodyCount - members.length });
+    if (!kept.length) setErr("No usable rows found. Expected columns: first name, last name, email, phone.");
+  };
+
+  const doImport = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const res = await createMembersBulk(rows);
+      let invited = 0;
+      if (invite) for (const m of rows) if (m.email) { const r = await inviteMemberEmail(m.email); if (r.ok) invited++; }
+      const bits = [`Imported ${res.created} member${res.created === 1 ? "" : "s"}`];
+      if (invite) bits.push(`emailed ${invited} invite${invited === 1 ? "" : "s"}`);
+      onDone(bits.join(", ") + "." + (res.errors.length ? ` (${res.errors.join("; ")})` : ""));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Import failed.");
+    } finally { setBusy(false); }
+  };
+
+  const template = "first_name,last_name,email,phone\nJane,Doe,jane@example.com,514-555-0100\nMarco,Rossi,marco@example.com,514-555-0142\n";
+  const templateHref = "data:text/csv;charset=utf-8," + encodeURIComponent(template);
+
+  return (
+    <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">Import members from a spreadsheet</h2>
+        <a href={templateHref} download="oxround-members-template.csv" className="text-xs font-medium text-brand hover:underline">Download CSV template</a>
+      </div>
+      <p className="mb-3 text-xs text-neutral-500">
+        In Excel or Google Sheets, save your list as CSV, then choose the file (or paste it) below. We read columns named
+        first name, last name, email and phone — in any order. No header row? We assume that order. Duplicate emails are skipped.
+      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(ingest); }}
+          className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white" />
+        <span className="text-xs text-neutral-400">or paste below</span>
+      </div>
+      <textarea
+        placeholder={"first_name,last_name,email,phone\nJane,Doe,jane@example.com,514-555-0100"}
+        onChange={(e) => ingest(e.target.value)}
+        className="mt-3 h-24 w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs"
+      />
+      {err && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+      {rows.length > 0 && (
+        <div className="mt-3">
+          <div className="mb-2 text-sm text-neutral-700">
+            <span className="font-semibold text-green-700">{rows.length} ready</span>
+            {stats && stats.dupes > 0 && <span className="text-neutral-500"> · {stats.dupes} duplicate{stats.dupes === 1 ? "" : "s"} skipped</span>}
+            {stats && stats.skipped > 0 && <span className="text-neutral-500"> · {stats.skipped} row{stats.skipped === 1 ? "" : "s"} without a name skipped</span>}
+          </div>
+          <div className="max-h-48 overflow-auto rounded-md border border-neutral-200">
+            <table className="w-full text-xs">
+              <thead className="bg-neutral-50 text-left text-neutral-500">
+                <tr><th className="px-3 py-1.5">First</th><th className="px-3 py-1.5">Last</th><th className="px-3 py-1.5">Email</th><th className="px-3 py-1.5">Phone</th></tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 8).map((m, i) => (
+                  <tr key={i} className="border-t border-neutral-100">
+                    <td className="px-3 py-1.5">{m.first_name}</td><td className="px-3 py-1.5">{m.last_name}</td>
+                    <td className="px-3 py-1.5">{m.email}</td><td className="px-3 py-1.5">{m.phone}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length > 8 && <div className="px-3 py-1.5 text-xs text-neutral-400">+{rows.length - 8} more…</div>}
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-xs text-neutral-600">
+            <input type="checkbox" checked={invite} onChange={(e) => setInvite(e.target.checked)} />
+            Also email each of them an app invite now (leave off to import quietly and invite later)
+          </label>
+          <button onClick={doImport} disabled={busy} className="mt-3 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50">
+            {busy ? "Importing…" : `Import ${rows.length} member${rows.length === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
