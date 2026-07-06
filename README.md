@@ -19,7 +19,7 @@
 - **TO DEPLOY:** `git push` (code + migration files), then `supabase functions deploy invite-member` and `supabase secrets set APP_URL=<your vercel/app url>`.
 - **Decided not yet built (D-19/D-21):** ONE login routes by role — owner/manager→full CRM, coach/receptionist→restricted CRM view (same app), member→`/app` web app; CRM gets a Scanner tab, member app gets a My QR tab; full end-to-end QR check-in. Native apps later. Full checklist = DEPLOY.md Step 6.
 - **Accounts ready:** Sentry ✅ + Resend ✅ made (wiring in DEPLOY 5.4 + 5.9). Domain still to buy.
-- **Last updated:** 2026-07-04 (real auth built; deployed + responsive earlier same day).
+- **Last updated:** 2026-07-05 (login page redesigned: Member/Coach/Owner tabs — cosmetic only, server still routes by real role).
 
 **The direction in one sentence:** finish making both products fully clickable on your laptop for free, use that to win G1, then pay to put it online.
 

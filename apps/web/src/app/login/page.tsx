@@ -11,12 +11,22 @@ export default function LoginPage() {
   return <Suspense><LoginInner /></Suspense>;
 }
 
+type Role = "member" | "coach" | "owner";
+
+const ROLE_TABS: { id: Role; label: string; icon: string; subtitle: string; placeholder: string }[] = [
+  { id: "member", label: "Member", icon: "🥊", subtitle: "Sign in to your member app", placeholder: "you@email.com" },
+  { id: "coach", label: "Coach", icon: "🧤", subtitle: "Sign in to your coach dashboard", placeholder: "coach@yourgym.com" },
+  { id: "owner", label: "Owner", icon: "🏟️", subtitle: "Sign in to your gym CRM", placeholder: "owner@yourgym.com" },
+];
+
 function LoginInner() {
+  const [role, setRole] = useState<Role>("member");
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(useSearchParamsError());
   const [busy, setBusy] = useState(false);
   const router = useRouter();
+  const tab = ROLE_TABS.find((t) => t.id === role)!;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,10 +58,28 @@ function LoginInner() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950 p-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-2xl">
-        <div className="mb-6 text-center">
-          <div className="text-3xl">🥊</div>
+        <div className="mb-5 text-center">
+          <div className="text-3xl">{tab.icon}</div>
           <h1 className="mt-2 text-xl font-bold tracking-tight">OxRound</h1>
-          <p className="text-sm text-neutral-500">Sign in</p>
+          <p className="text-sm text-neutral-500">{tab.subtitle}</p>
+        </div>
+
+        {/* Role tabs */}
+        <div className="mb-5 grid grid-cols-3 gap-1 rounded-lg bg-neutral-100 p-1">
+          {ROLE_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => { setRole(t.id); setError(null); }}
+              className={`rounded-md px-2 py-1.5 text-sm font-medium transition ${
+                role === t.id
+                  ? "bg-white text-neutral-900 shadow"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
         {!sent ? (
@@ -59,7 +87,7 @@ function LoginInner() {
             <input
               type="email"
               required
-              placeholder="you@yourgym.com"
+              placeholder={tab.placeholder}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-md border border-neutral-300 px-3 py-2.5 text-sm"
@@ -80,7 +108,10 @@ function LoginInner() {
               Sign-in link sent to <span className="font-semibold">{email}</span>. Open it in this browser.
             </div>
             {isDemoMode && (
-              <button onClick={() => router.push("/")} className="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white">
+              <button
+                onClick={() => router.push(role === "member" ? "/app" : "/")}
+                className="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white"
+              >
                 Continue (demo — simulates clicking the link)
               </button>
             )}
