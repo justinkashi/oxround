@@ -67,12 +67,22 @@ Deno.serve(async (req) => {
     if (!gymId) return json({ error: "your account isn't linked to a gym — sign out and back in" }, 400);
 
     // The member row must already exist in the caller's gym (created by the owner). Emails are stored lowercased.
-    const { data: member } = await admin
+    // Ignore archived rows and take the newest match: an email can legitimately appear on
+    // archived duplicates (add → archive → re-add). maybeSingle() alone errors on >1 row,
+    // which made invites fail with "no member with that email" — 2026-07-06 fix.
+    const { data: member, error: lookupErr } = await admin
       .from("gym_members")
       .select("id, user_id, gym_id")
       .eq("email", email)
       .eq("gym_id", gymId)
+      .neq("status", "archived")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
+    if (lookupErr) {
+      console.error("invite-member: member lookup failed:", lookupErr.message);
+      return json({ error: `member lookup failed: ${lookupErr.message}` }, 500);
+    }
     if (!member) return json({ error: "add the member first — no member with that email in your gym" }, 404);
 
     const appUrl = Deno.env.get("APP_URL");
