@@ -6,6 +6,12 @@ import Link from "next/link";
 import { createMember, createMembersBulk, getMembership, inviteMemberEmail, listMembers, type BulkMemberInput } from "@/lib/data";
 import type { GymMember, Membership } from "@/lib/types";
 
+function errText(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object" && "message" in err) return String((err as { message: unknown }).message);
+  return "Could not add — please try again.";
+}
+
 export default function MembersPage() {
   const [members, setMembers] = useState<GymMember[]>([]);
   const [memberships, setMemberships] = useState<Record<string, Membership | null>>({});
@@ -49,7 +55,7 @@ export default function MembersPage() {
       setShowForm(false);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add — please try again.");
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -85,7 +91,7 @@ export default function MembersPage() {
               key={f}
               required={f === "first_name"}
               type={f === "email" ? "email" : "text"}
-              placeholder={f.replace("_", " ")}
+              placeholder={f === "phone" ? "phone (optional)" : f === "email" ? "email (optional)" : f.replace("_", " ")}
               value={form[f]}
               onChange={(e) => setForm({ ...form, [f]: e.target.value })}
               className="rounded-md border border-neutral-300 px-3 py-2 text-sm"

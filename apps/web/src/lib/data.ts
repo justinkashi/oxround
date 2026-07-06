@@ -149,7 +149,13 @@ export async function createMember(
   input: { first_name: string; last_name: string; email: string; phone: string; role?: "member" | "coach" },
 ): Promise<GymMember> {
   const role = input.role ?? "member";
-  const { role: _omit, ...fields } = input;
+  // Only first_name is required; last_name/email/phone are optional → store null when blank.
+  const fields = {
+    first_name: input.first_name.trim(),
+    last_name: input.last_name?.trim() || null,
+    email: input.email?.trim() || null,
+    phone: input.phone?.trim() || null,
+  };
   if (isDemoMode) {
     const m: GymMember = {
       id: `m${Date.now()}`, gym_id: "g1", roles: [role], status: "active",
@@ -174,15 +180,16 @@ export async function createMember(
     .insert({ ...fields, gym_id: gymId, roles: [role], check_in_token_hash: hash })
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   const member = data as GymMember;
   // D-24: a new MEMBER starts UNPAID — pending membership gates their QR (D-20) until first payment.
   // Coaches have no membership.
   if (role === "member") {
-    await supabase().from("memberships").insert({
+    const { error: mErr } = await supabase().from("memberships").insert({
       gym_id: gymId, gym_member_id: member.id,
       status: "active", payment_status: "pending", start_date: new Date().toISOString().slice(0, 10),
     });
+    if (mErr) throw new Error(mErr.message);
   }
   (data as Record<string, unknown>).__raw_token = raw;
   return member;
@@ -237,7 +244,7 @@ export async function createMembersBulk(input: BulkMemberInput[]): Promise<BulkI
     };
   }));
   const { data, error } = await supabase().from("gym_members").insert(memberRows).select("id");
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   const ids = (data as { id: string }[]).map((d) => d.id);
   result.created = ids.length;
   if (ids.length) {
