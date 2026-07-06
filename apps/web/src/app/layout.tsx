@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Nav from "./nav";
+import { Toasts } from "@/components/toast";
 
 export const metadata: Metadata = {
   title: "OxRound — G1 Boxing",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Nav />
           <main className="flex-1 p-4 md:p-8">{children}</main>
         </div>
+        <Toasts />
       </body>
     </html>
   );

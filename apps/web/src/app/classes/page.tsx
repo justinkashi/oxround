@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { bookingCounts, createClass, deactivateClass, listClasses, listCoaches, listSessions } from "@/lib/data";
 import type { ClassSession, GymClass, GymMember } from "@/lib/types";
+import DestructiveActionModal from "@/components/DestructiveActionModal";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const COLOR_CLASSES: Record<string, string> = {
@@ -30,6 +31,7 @@ export default function ClassesPage() {
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [coaches, setCoaches] = useState<GymMember[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [deactivating, setDeactivating] = useState<GymClass | null>(null);
   const [form, setForm] = useState({ name: "", description: "", coach_id: "", start_time: "18:00", duration_mins: 60, capacity: 16, location: "Main floor", color: "red", days: [] as number[] });
 
   const load = async () => {
@@ -159,7 +161,7 @@ export default function ClassesPage() {
                 <td className="px-4 py-2">{coaches.find((c) => c.id === cl.coach_id)?.first_name ?? "—"}</td>
                 <td className="px-4 py-2">{cl.capacity ?? "∞"}</td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={async () => { if (confirm(`Deactivate ${cl.name}? Future sessions are removed.`)) { await deactivateClass(cl.id); load(); } }}
+                  <button onClick={() => setDeactivating(cl)}
                     className="text-xs text-red-600 hover:underline">deactivate</button>
                 </td>
               </tr>
@@ -167,6 +169,16 @@ export default function ClassesPage() {
           </tbody>
         </table>
       </div>
+
+      <DestructiveActionModal
+        open={!!deactivating}
+        title={`Deactivate ${deactivating?.name ?? ""}?`}
+        description="Future sessions are removed from the schedule. Past attendance history is kept. You can recreate the class later."
+        actionLabel="Deactivate class"
+        confirmText={deactivating?.name}
+        onConfirm={async () => { if (deactivating) { await deactivateClass(deactivating.id); load(); } }}
+        onClose={() => setDeactivating(null)}
+      />
     </div>
   );
 }

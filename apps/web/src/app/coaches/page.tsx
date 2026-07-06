@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { listCoaches, listMembers, setMemberRoles } from "@/lib/data";
 import type { GymMember } from "@/lib/types";
+import DestructiveActionModal from "@/components/DestructiveActionModal";
 
 export default function CoachesPage() {
   const [coaches, setCoaches] = useState<GymMember[]>([]);
@@ -25,8 +26,8 @@ export default function CoachesPage() {
     load();
   };
 
+  const [demoting, setDemoting] = useState<GymMember | null>(null);
   const demote = async (m: GymMember) => {
-    if (!confirm(`Remove coach role from ${m.first_name}?`)) return;
     await setMemberRoles(m.id, m.roles.filter((r) => r !== "coach"));
     load();
   };
@@ -66,7 +67,7 @@ export default function CoachesPage() {
             <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
               <span>{c.phone ?? ""}</span>
               {c.roles.includes("coach") && !c.roles.includes("owner") && (
-                <button onClick={() => demote(c)} className="text-red-600 hover:underline">remove coach role</button>
+                <button onClick={() => setDemoting(c)} className="text-red-600 hover:underline">remove coach role</button>
               )}
             </div>
           </div>
@@ -74,6 +75,15 @@ export default function CoachesPage() {
         {coaches.length === 0 && <div className="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-400 sm:col-span-2 lg:col-span-3">No staff yet</div>}
       </div>
       <p className="mt-4 text-xs text-neutral-400">Role permissions (owner / manager / coach / receptionist) are enforced server-side once deployed — this screen manages who holds which role.</p>
+
+      <DestructiveActionModal
+        open={!!demoting}
+        title={`Remove coach role from ${demoting?.first_name ?? ""}?`}
+        description="They keep their membership and history — they just lose CRM coach access. You can promote them again anytime."
+        actionLabel="Remove coach role"
+        onConfirm={async () => { if (demoting) await demote(demoting); }}
+        onClose={() => setDemoting(null)}
+      />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { addBooking, cancelSession, getSession, listMembers, sessionBookings, setBookingStatus } from "@/lib/data";
 import type { ClassBooking, ClassSession, GymMember } from "@/lib/types";
+import DestructiveActionModal from "@/components/DestructiveActionModal";
 
 function SessionInner() {
   const id = useSearchParams().get("id") ?? "";
@@ -14,6 +15,7 @@ function SessionInner() {
   const [bookings, setBookings] = useState<ClassBooking[]>([]);
   const [members, setMembers] = useState<GymMember[]>([]);
   const [addId, setAddId] = useState("");
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const load = async () => {
     const [s, b, m] = await Promise.all([getSession(id), sessionBookings(id), listMembers()]);
@@ -45,10 +47,19 @@ function SessionInner() {
             {session.capacity != null && <> · {active.filter((b) => b.status !== "no_show").length}/{session.capacity} spots</>}</p>
         </div>
         {session.status === "scheduled" && (
-          <button onClick={async () => { if (confirm("Cancel this session? Booked members should be notified.")) { await cancelSession(id); load(); } }}
+          <button onClick={() => setConfirmCancel(true)}
             className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Cancel session</button>
         )}
       </div>
+
+      <DestructiveActionModal
+        open={confirmCancel}
+        title="Cancel this session?"
+        description="Booked members should be notified. The session stays visible as CANCELED; bookings are kept for the record."
+        actionLabel="Cancel session"
+        onConfirm={async () => { await cancelSession(id); load(); }}
+        onClose={() => setConfirmCancel(false)}
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select value={addId} onChange={(e) => setAddId(e.target.value)} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">

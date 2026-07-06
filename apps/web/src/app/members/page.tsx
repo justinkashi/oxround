@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   createMember, createMembersBulk, inviteMemberEmail, listArchivedMembers,
-  listMembersWithMemberships, setMemberStatus, updateMember,
-  type BulkMemberInput, type MemberWithMembership,
+  listMembersWithMemberships, setMemberStatus, updateMember, MEMBERS_PAGE_SIZE,
+  type BulkMemberInput, type MemberFilter, type MemberWithMembership,
 } from "@/lib/data";
 import type { GymMember } from "@/lib/types";
+import DestructiveActionModal from "@/components/DestructiveActionModal";
 
 function errText(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -18,6 +19,9 @@ function errText(err: unknown): string {
 
 export default function MembersPage() {
   const [rows, setRows] = useState<MemberWithMembership[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [filter, setFilter] = useState<MemberFilter>("all");
   const [archived, setArchived] = useState<GymMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -37,8 +41,12 @@ export default function MembersPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [ms, arch] = await Promise.all([listMembersWithMemberships(), listArchivedMembers()]);
-      setRows(ms);
+      const [ms, arch] = await Promise.all([
+        listMembersWithMemberships({ page, q, filter }),
+        listArchivedMembers(),
+      ]);
+      setRows(ms.rows);
+      setTotal(ms.total);
       setArchived(arch);
     } catch (e) {
       setLoadError(errText(e));
@@ -46,11 +54,14 @@ export default function MembersPage() {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); }, []);
+  // Debounced server-side search + filter + page (VERSION 2: max 50 rows per fetch).
+  useEffect(() => {
+    const t = setTimeout(load, q ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [page, q, filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = rows.filter(({ member: m }) =>
-    `${m.first_name} ${m.last_name ?? ""} ${m.email ?? ""}`.toLowerCase().includes(q.toLowerCase()),
-  );
+  const filtered = rows;
+  const pageCount = Math.max(1, Math.ceil(total / MEMBERS_PAGE_SIZE));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,16 +105,13 @@ export default function MembersPage() {
     }
   };
 
+  // Archive flows through DestructiveActionModal (type-to-confirm) — VERSION 2.
+  const [archiving, setArchiving] = useState<GymMember | null>(null);
   const archive = async (m: GymMember) => {
-    if (!window.confirm(`Archive ${m.first_name} ${m.last_name ?? ""}?\nThey leave your active list but are NOT deleted — restore them anytime from “Show archived”.`)) return;
     setError(null);
-    try {
-      await setMemberStatus(m.id, "archived");
-      setNotice(`${m.first_name} archived.`);
-      load();
-    } catch (err) {
-      setError(errText(err));
-    }
+    await setMemberStatus(m.id, "archived"); // throws → modal surfaces the toast
+    setNotice(`${m.first_name} archived.`);
+    load();
   };
 
   const restore = async (m: GymMember) => {
@@ -170,13 +178,24 @@ export default function MembersPage() {
         </form>
       )}
 
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <input
           placeholder="Search members…"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => { setQ(e.target.value); setPage(0); }}
           className="w-full max-w-sm rounded-md border border-neutral-300 px-3 py-2 text-sm"
         />
+        <div className="flex items-center gap-1.5">
+          {([["all", "All"], ["past_due", "Past due"], ["new_this_month", "New this month"]] as [MemberFilter, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => { setFilter(key); setPage(0); }}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${filter === key ? "border-brand bg-brand text-white" : "border-neutral-300 text-neutral-600 hover:bg-neutral-50"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button onClick={() => setShowArchived(!showArchived)} className="whitespace-nowrap text-sm text-neutral-500 hover:text-brand">
           {showArchived ? "Hide archived" : `Show archived${archived.length ? ` (${archived.length})` : ""}`}
         </button>
@@ -222,12 +241,21 @@ export default function MembersPage() {
                   <td className="whitespace-nowrap px-4 py-2 text-right">
                     <button onClick={() => { setEditing(m); setEditError(null); }} className="text-xs font-medium text-neutral-600 hover:text-brand">Edit</button>
                     <button onClick={() => resend(m)} className="ml-3 text-xs font-medium text-neutral-600 hover:text-brand">Resend invite</button>
-                    <button onClick={() => archive(m)} className="ml-3 text-xs font-medium text-red-600 hover:underline">Archive</button>
+                    <button onClick={() => setArchiving(m)} className="ml-3 text-xs font-medium text-red-600 hover:underline">Archive</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-2 text-xs text-neutral-500">
+              <span>{total} members · page {page + 1} of {pageCount}</span>
+              <div className="flex gap-2">
+                <button disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded border border-neutral-300 px-2 py-1 disabled:opacity-40">← Prev</button>
+                <button disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)} className="rounded border border-neutral-300 px-2 py-1 disabled:opacity-40">Next →</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -254,6 +282,16 @@ export default function MembersPage() {
           onSave={saveEdit}
         />
       )}
+
+      <DestructiveActionModal
+        open={!!archiving}
+        title={`Archive ${archiving?.first_name ?? ""} ${archiving?.last_name ?? ""}?`}
+        description="They leave your active list but are NOT deleted — restore them anytime from “Show archived”. Their history (check-ins, payments) is kept."
+        actionLabel="Archive member"
+        confirmText={archiving ? `${archiving.first_name} ${archiving.last_name ?? ""}`.trim() : undefined}
+        onConfirm={async () => { if (archiving) await archive(archiving); }}
+        onClose={() => setArchiving(null)}
+      />
     </div>
   );
 }
@@ -369,29 +407,41 @@ function rowsToMembers(rows: string[][]): { members: BulkMemberInput[]; bodyCoun
   return { members, bodyCount: body.length };
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 function ImportCsv({ existingEmails, onDone }: { existingEmails: Set<string>; onDone: (msg: string) => void }) {
   const [rows, setRows] = useState<BulkMemberInput[]>([]);
+  const [invalid, setInvalid] = useState<{ row: BulkMemberInput; issue: string }[]>([]);
   const [stats, setStats] = useState<{ dupes: number; skipped: number } | null>(null);
   const [invite, setInvite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Validate-then-import (Twenty spreadsheet-import pattern): every row is
+  // checked BEFORE anything is written; problem rows are listed, never inserted.
   const ingest = (text: string) => {
     setErr(null);
-    if (!text.trim()) { setRows([]); setStats(null); return; }
+    if (!text.trim()) { setRows([]); setInvalid([]); setStats(null); return; }
     const { members, bodyCount } = rowsToMembers(parseCSV(text));
     const seen = new Set<string>();
     let dupes = 0;
     const kept: BulkMemberInput[] = [];
+    const bad: { row: BulkMemberInput; issue: string }[] = [];
     for (const m of members) {
       const key = (m.email ?? "").trim().toLowerCase();
+      if (key && !EMAIL_RE.test(key)) { bad.push({ row: m, issue: `invalid email “${m.email}”` }); continue; }
       if (key && (existingEmails.has(key) || seen.has(key))) { dupes++; continue; }
+      if ((m.phone ?? "").trim() && (m.phone ?? "").replace(/[\s().+-]/g, "").match(/[^0-9]/)) {
+        bad.push({ row: m, issue: `phone “${m.phone}” contains letters` });
+        continue;
+      }
       if (key) seen.add(key);
       kept.push(m);
     }
     setRows(kept);
+    setInvalid(bad);
     setStats({ dupes, skipped: bodyCount - members.length });
-    if (!kept.length) setErr("No usable rows found. Expected columns: first name, last name, email, phone.");
+    if (!kept.length && !bad.length) setErr("No usable rows found. Expected columns: first name, last name, email, phone.");
   };
 
   const doImport = async () => {
@@ -432,6 +482,15 @@ function ImportCsv({ existingEmails, onDone }: { existingEmails: Set<string>; on
         className="mt-3 h-24 w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs"
       />
       {err && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+      {invalid.length > 0 && (
+        <div className="mt-3 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-xs text-yellow-800">
+          <p className="mb-1 font-semibold">{invalid.length} row{invalid.length === 1 ? "" : "s"} need fixing (won&apos;t be imported):</p>
+          {invalid.slice(0, 5).map((b, i) => (
+            <p key={i}>· {b.row.first_name} {b.row.last_name} — {b.issue}</p>
+          ))}
+          {invalid.length > 5 && <p>…and {invalid.length - 5} more. Fix them in your spreadsheet and re-upload.</p>}
+        </div>
+      )}
       {rows.length > 0 && (
         <div className="mt-3">
           <div className="mb-2 text-sm text-neutral-700">

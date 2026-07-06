@@ -16,6 +16,69 @@ export interface GymMember {
   status: MemberStatus;
   joined_at: string | null;
   emergency_contact: { name: string; phone: string; relation: string } | null;
+  created_at?: string;
+  // Boxing profile (D-07) — in the DB since 0001, surfaced on the Fighter Card.
+  weight_class?: string | null;
+  skill_level?: string | null;
+  fight_record?: { wins: number; losses: number; draws: number } | null;
+  medical_notes?: string | null;
+}
+
+// ---- Twenty-transfer types (migration 0010) ----
+
+export type TimelineEventType =
+  | "check_in" | "payment" | "membership_change" | "member_created"
+  | "status_change" | "note_added" | "task_done" | "message" | "custom";
+
+export interface TimelineEvent {
+  id: string;
+  gym_id: string;
+  happens_at: string;
+  event_type: TimelineEventType;
+  title: string | null;
+  properties: Record<string, unknown> | null;
+  actor_member_id: string | null;
+  target_member_id: string | null;
+  target_lead_id: string | null;
+}
+
+export type TaskStatus = "todo" | "doing" | "done";
+
+export interface GymTask {
+  id: string;
+  gym_id: string;
+  title: string;
+  body: string | null;
+  due_at: string | null;
+  status: TaskStatus;
+  assignee_member_id: string | null;
+  assignee_name?: string;
+  target_member_id: string | null;
+  target_lead_id: string | null;
+  created_at: string;
+}
+
+export interface Attachment {
+  id: string;
+  gym_id: string;
+  name: string;
+  storage_path: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  category: "waiver" | "document" | "image" | "other";
+  target_member_id: string | null;
+  target_lead_id: string | null;
+  created_at: string;
+}
+
+export interface CoachNote {
+  id: string;
+  member_id: string;
+  author_id: string | null;
+  author_name?: string;
+  body: string;
+  visibility: "staff" | "owner_only" | "member_visible";
+  created_at: string;
 }
 
 export interface Membership {
@@ -139,6 +202,8 @@ export interface Lead {
   follow_up_date: string | null;
   notes: string | null;
   created_at: string;
+  position?: number;               // kanban drag ordering (0010)
+  estimated_value_cents?: number | null; // column $ aggregate (0010)
 }
 
 export interface Message {

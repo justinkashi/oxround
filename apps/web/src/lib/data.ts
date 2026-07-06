@@ -4,10 +4,11 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { exec, newClientKey, withRetry } from "./resilience";
 import type {
-  Announcement, BookingStatus, CheckIn, ClassBooking, ClassSession, GymClass, GymMember,
-  GymSettings, Lead, LeadStatus, MemberAttendanceSummary, Membership, MembershipPlan,
-  Message, Payment, PaymentStatus,
+  Announcement, Attachment, BookingStatus, CheckIn, ClassBooking, ClassSession, CoachNote,
+  GymClass, GymMember, GymSettings, GymTask, Lead, LeadStatus, MemberAttendanceSummary,
+  Membership, MembershipPlan, Message, Payment, PaymentStatus, TaskStatus, TimelineEvent,
 } from "./types";
 
 // Grace period before a past-due member is treated as overdue (D-20). Default 7 days.
@@ -94,6 +95,10 @@ const state = {
     { id: "msg1", sender_member_id: "m6", sender_name: "Tony Bélanger", recipient_member_id: null, body: "Reminder: no sparring class this Friday — coach away.", is_broadcast: true, created_at: new Date(Date.now() - 2 * 86400000).toISOString(), read_at: null },
     { id: "msg2", sender_member_id: "m1", sender_name: "Marco Silva", recipient_member_id: null, body: "Hey, can I freeze my membership for July? Traveling.", is_broadcast: false, created_at: new Date(Date.now() - 86400000).toISOString(), read_at: null },
   ] as Message[],
+  // Twenty-transfer demo state (timeline is derived from check-ins/payments on read)
+  notes: [] as CoachNote[],
+  tasks: [] as GymTask[],
+  attachments: [] as Attachment[],
 };
 
 export async function listMembers(): Promise<GymMember[]> {
@@ -132,7 +137,7 @@ export async function setPaymentStatus(memberId: string, status: PaymentStatus):
     if (s) s.payment_status = status;
     return;
   }
-  await supabase().from("memberships").update({ payment_status: status }).eq("gym_member_id", memberId).eq("status", "active");
+  await exec(() => supabase().from("memberships").update({ payment_status: status }).eq("gym_member_id", memberId).eq("status", "active"));
 }
 
 // A3 Interconnected: archive (soft-delete, D-03) — check-in function rejects non-active members.
@@ -142,7 +147,7 @@ export async function setMemberStatus(memberId: string, status: GymMember["statu
     if (m) m.status = status;
     return;
   }
-  await supabase().from("gym_members").update({ status }).eq("id", memberId);
+  await exec(() => supabase().from("gym_members").update({ status }).eq("id", memberId));
 }
 
 // Edit a member's contact fields (owner-only per RLS members_owner_update). Emails stored lowercased.
@@ -162,8 +167,7 @@ export async function updateMember(
     if (m) Object.assign(m, clean);
     return;
   }
-  const { error } = await supabase().from("gym_members").update(clean).eq("id", id);
-  if (error) throw new Error(error.message);
+  await exec(() => supabase().from("gym_members").update(clean).eq("id", id));
 }
 
 export async function listArchivedMembers(): Promise<GymMember[]> {
@@ -175,20 +179,61 @@ export async function listArchivedMembers(): Promise<GymMember[]> {
 
 export type MemberWithMembership = { member: GymMember; membership: Membership | null };
 
+// Filter presets shown as chips on the Members page (Twenty "views", lite).
+export type MemberFilter = "all" | "past_due" | "new_this_month";
+export const MEMBERS_PAGE_SIZE = 50;
+
+export type MembersPage = { rows: MemberWithMembership[]; total: number };
+
 // One batched query — replaces the N+1 where each member's membership was fetched separately.
-export async function listMembersWithMemberships(): Promise<MemberWithMembership[]> {
+// VERSION 2: server-side pagination (max 50 rows/fetch), search + filter pushed to the DB.
+export async function listMembersWithMemberships(
+  opts: { page?: number; q?: string; filter?: MemberFilter } = {},
+): Promise<MembersPage> {
+  const page = opts.page ?? 0;
+  const q = (opts.q ?? "").trim();
+  const filter = opts.filter ?? "all";
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  const monthStartIso = monthStart.toISOString().slice(0, 10);
+
   if (isDemoMode) {
-    return state.members
+    let rows = state.members
       .filter((m) => m.status !== "archived")
       .map((member) => ({ member, membership: state.memberships.find((s) => s.gym_member_id === member.id) ?? null }));
+    if (q) rows = rows.filter(({ member: m }) => `${m.first_name} ${m.last_name ?? ""} ${m.email ?? ""}`.toLowerCase().includes(q.toLowerCase()));
+    if (filter === "past_due") rows = rows.filter(({ membership: s }) => s?.payment_status === "overdue" || s?.payment_status === "pending");
+    if (filter === "new_this_month") rows = rows.filter(({ member: m }) => (m.joined_at ?? m.created_at ?? "") >= monthStartIso);
+    return { rows: rows.slice(page * MEMBERS_PAGE_SIZE, (page + 1) * MEMBERS_PAGE_SIZE), total: rows.length };
   }
-  const { data, error } = await supabase()
+
+  let query = supabase()
     .from("gym_members")
-    .select("*, memberships(*, membership_plans(name))")
-    .neq("status", "archived")
-    .order("first_name");
+    .select("*, memberships(*, membership_plans(name))", { count: "exact" })
+    .neq("status", "archived");
+  if (q) {
+    const like = `%${q.replace(/[%_]/g, "")}%`;
+    query = query.or(`first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`);
+  }
+  if (filter === "past_due") {
+    // inner join → only members whose active membership is overdue/pending
+    query = supabase()
+      .from("gym_members")
+      .select("*, memberships!inner(*, membership_plans(name))", { count: "exact" })
+      .neq("status", "archived")
+      .eq("memberships.status", "active")
+      .in("memberships.payment_status", ["overdue", "pending"]);
+    if (q) {
+      const like = `%${q.replace(/[%_]/g, "")}%`;
+      query = query.or(`first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`);
+    }
+  }
+  if (filter === "new_this_month") query = query.gte("created_at", monthStartIso);
+  const { data, error, count } = await query
+    .order("first_name")
+    .range(page * MEMBERS_PAGE_SIZE, (page + 1) * MEMBERS_PAGE_SIZE - 1);
   if (error) throw new Error(error.message);
-  return (data as Array<Record<string, unknown>>).map((row) => {
+  const rows = (data as Array<Record<string, unknown>>).map((row) => {
     const { memberships, ...rest } = row as Record<string, unknown> & { memberships?: Array<Record<string, unknown>> };
     const list = (memberships ?? []) as Array<Record<string, unknown> & { status?: string; membership_plans?: { name: string } }>;
     const active = list.find((s) => s.status === "active") ?? list[0] ?? null;
@@ -197,6 +242,7 @@ export async function listMembersWithMemberships(): Promise<MemberWithMembership
       : null;
     return { member: rest as unknown as GymMember, membership };
   });
+  return { rows, total: count ?? rows.length };
 }
 
 export async function createMember(
@@ -237,21 +283,19 @@ export async function createMember(
   const raw = crypto.randomUUID() + crypto.randomUUID();
   const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
   const hash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const { data, error } = await supabase()
+  const data = await exec(() => supabase()
     .from("gym_members")
-    .insert({ ...fields, gym_id: gymId, roles: [role], check_in_token_hash: hash })
+    .insert({ ...fields, gym_id: gymId, roles: [role], check_in_token_hash: hash, client_key: newClientKey() })
     .select()
-    .single();
-  if (error) throw new Error(error.message);
+    .single());
   const member = data as GymMember;
   // D-24: a new MEMBER starts UNPAID — pending membership gates their QR (D-20) until first payment.
   // Coaches have no membership.
   if (role === "member") {
-    const { error: mErr } = await supabase().from("memberships").insert({
-      gym_id: gymId, gym_member_id: member.id,
+    await exec(() => supabase().from("memberships").insert({
+      gym_id: gymId, gym_member_id: member.id, client_key: newClientKey(),
       status: "active", payment_status: "pending", start_date: new Date().toISOString().slice(0, 10),
-    });
-    if (mErr) throw new Error(mErr.message);
+    }));
   }
   (data as Record<string, unknown>).__raw_token = raw;
   return member;
@@ -300,18 +344,18 @@ export async function createMembersBulk(input: BulkMemberInput[]): Promise<BulkI
     const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
     const hash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
     return {
-      gym_id: gymId, roles: ["member"], check_in_token_hash: hash,
+      gym_id: gymId, roles: ["member"], check_in_token_hash: hash, client_key: newClientKey(),
       first_name: r.first_name, last_name: r.last_name || null,
       email: r.email || null, phone: r.phone || null,
     };
   }));
-  const { data, error } = await supabase().from("gym_members").insert(memberRows).select("id");
-  if (error) throw new Error(error.message);
+  const data = await exec(() => supabase().from("gym_members").insert(memberRows).select("id"));
   const ids = (data as { id: string }[]).map((d) => d.id);
   result.created = ids.length;
   if (ids.length) {
     const membershipRows = ids.map((id) => ({
-      gym_id: gymId, gym_member_id: id, status: "active", payment_status: "pending", start_date: today,
+      gym_id: gymId, gym_member_id: id, client_key: newClientKey(),
+      status: "active", payment_status: "pending", start_date: today,
     }));
     const { error: mErr } = await supabase().from("memberships").insert(membershipRows);
     if (mErr) result.errors.push(`Members added, but their memberships didn't: ${mErr.message}`);
@@ -387,7 +431,7 @@ export async function recordManualCheckIn(memberId: string): Promise<void> {
     });
     return;
   }
-  await supabase().from("check_ins").insert({ gym_id: m.gym_id, gym_member_id: memberId, method: "manual_staff" });
+  await exec(() => supabase().from("check_ins").insert({ gym_id: m.gym_id, gym_member_id: memberId, method: "manual_staff" }));
 }
 
 // Scanner check-in (Step 6D). Validates active + paid (D-20 gate) then records the visit.
@@ -417,8 +461,8 @@ export async function checkInMember(memberId: string): Promise<CheckInResult> {
     });
     return { ok: true, name };
   }
-  const { error } = await supabase().from("check_ins").insert({ gym_id: m.gym_id, gym_member_id: memberId, method: "qr_phone" });
-  if (error) return { ok: false, name, reason: error.message };
+  const res = await withRetry(() => supabase().from("check_ins").insert({ gym_id: m.gym_id, gym_member_id: memberId, method: "qr_phone" }));
+  if (res.error) return { ok: false, name, reason: (res.error as { message?: string }).message ?? "Could not record the check-in" };
   return { ok: true, name };
 }
 
@@ -502,11 +546,12 @@ export async function sendMessage(input: { recipient_member_id: string | null; b
     return;
   }
   const meId = await currentMemberId();
-  const { error } = await supabase().from("messages").insert({
-    gym_id: (await getCurrentMember())?.gym_id, sender_member_id: meId,
+  const gymId = (await getCurrentMember())?.gym_id;
+  const key = newClientKey();
+  await exec(() => supabase().from("messages").insert({
+    gym_id: gymId, sender_member_id: meId, client_key: key,
     recipient_member_id: input.recipient_member_id, body: input.body, is_broadcast: input.is_broadcast,
-  });
-  if (error) throw error;
+  }));
 }
 
 // Staff sends to a specific member (reply) or broadcast.
@@ -570,8 +615,7 @@ export async function createAnnouncement(input: { title: string; body: string; t
     return;
   }
   const gymId = await getMyGymId();
-  const { error } = await supabase().from("announcements").insert({ ...input, gym_id: gymId });
-  if (error) throw error;
+  await exec(() => supabase().from("announcements").insert({ ...input, gym_id: gymId }));
 }
 
 // ============ MEMBERSHIP PLANS ============
@@ -589,8 +633,7 @@ export async function createPlan(input: Omit<MembershipPlan, "id" | "gym_id" | "
     return;
   }
   const gymId = await getMyGymId();
-  const { error } = await supabase().from("membership_plans").insert({ ...input, gym_id: gymId });
-  if (error) throw error;
+  await exec(() => supabase().from("membership_plans").insert({ ...input, gym_id: gymId }));
 }
 
 export async function setPlanActive(planId: string, isActive: boolean): Promise<void> {
@@ -599,7 +642,7 @@ export async function setPlanActive(planId: string, isActive: boolean): Promise<
     if (p) p.is_active = isActive;
     return;
   }
-  await supabase().from("membership_plans").update({ is_active: isActive }).eq("id", planId);
+  await exec(() => supabase().from("membership_plans").update({ is_active: isActive }).eq("id", planId));
 }
 
 // ============ CLASSES & SESSIONS ============
@@ -636,8 +679,7 @@ export async function createClass(input: Omit<GymClass, "id" | "gym_id" | "is_ac
     return;
   }
   const gymId = await getMyGymId();
-  const { data, error } = await supabase().from("classes").insert({ ...input, gym_id: gymId }).select().single();
-  if (error) throw error;
+  const data = await exec(() => supabase().from("classes").insert({ ...input, gym_id: gymId }).select().single());
   // Generate session instances for the next 4 weeks (prod has no cron yet — DEPLOY C1).
   // A weekly pg_cron job should extend this window going forward.
   const cl = data as GymClass;
@@ -654,7 +696,7 @@ export async function createClass(input: Omit<GymClass, "id" | "gym_id" | "is_ac
       coach_id: cl.coach_id, status: "scheduled",
     });
   }
-  if (rows.length) await supabase().from("class_sessions").insert(rows);
+  if (rows.length) await exec(() => supabase().from("class_sessions").insert(rows));
 }
 
 export async function deactivateClass(classId: string): Promise<void> {
@@ -664,7 +706,7 @@ export async function deactivateClass(classId: string): Promise<void> {
     state.sessions = state.sessions.filter((s) => s.class_id !== classId || s.session_date < new Date().toISOString().slice(0, 10));
     return;
   }
-  await supabase().from("classes").update({ is_active: false }).eq("id", classId);
+  await exec(() => supabase().from("classes").update({ is_active: false }).eq("id", classId));
 }
 
 export async function listSessions(fromISO: string, toISO: string): Promise<ClassSession[]> {
@@ -699,7 +741,7 @@ export async function cancelSession(sessionId: string): Promise<void> {
     if (s) s.status = "canceled";
     return;
   }
-  await supabase().from("class_sessions").update({ status: "canceled" }).eq("id", sessionId);
+  await exec(() => supabase().from("class_sessions").update({ status: "canceled" }).eq("id", sessionId));
 }
 
 // ============ BOOKINGS ============
@@ -748,7 +790,7 @@ export async function addBooking(sessionId: string, memberId: string): Promise<v
     return;
   }
   const gymId = await getMyGymId();
-  await supabase().from("class_bookings").insert({ gym_id: gymId, session_id: sessionId, gym_member_id: memberId, status });
+  await exec(() => supabase().from("class_bookings").insert({ gym_id: gymId, session_id: sessionId, gym_member_id: memberId, status }));
 }
 
 export async function setBookingStatus(bookingId: string, status: BookingStatus): Promise<void> {
@@ -757,7 +799,7 @@ export async function setBookingStatus(bookingId: string, status: BookingStatus)
     if (b) b.status = status;
     return;
   }
-  await supabase().from("class_bookings").update({ status }).eq("id", bookingId);
+  await exec(() => supabase().from("class_bookings").update({ status }).eq("id", bookingId));
 }
 
 // ============ COACHES ============
@@ -775,7 +817,7 @@ export async function setMemberRoles(memberId: string, roles: GymMember["roles"]
     if (m) m.roles = roles;
     return;
   }
-  await supabase().from("gym_members").update({ roles }).eq("id", memberId);
+  await exec(() => supabase().from("gym_members").update({ roles }).eq("id", memberId));
 }
 
 // ============ PAYMENTS ============
@@ -785,7 +827,8 @@ export async function listPayments(): Promise<Payment[]> {
   const { data, error } = await supabase()
     .from("payments")
     .select("*, gym_members(first_name, last_name)")
-    .order("paid_at", { ascending: false });
+    .order("paid_at", { ascending: false })
+    .limit(200); // VERSION 2: never pull a whole table into the browser
   if (error) throw error;
   return (data as unknown as Array<Record<string, unknown> & { gym_members: { first_name: string; last_name: string | null } }>).map((r) => ({
     id: r.id as string, gym_member_id: r.gym_member_id as string,
@@ -809,9 +852,9 @@ export async function recordPayment(input: { gym_member_id: string; amount_cents
     return;
   }
   const gymId = await getMyGymId();
-  const { error } = await supabase().from("payments").insert({ ...input, gym_id: gymId });
-  if (error) throw error;
-  await supabase().from("memberships").update({ payment_status: "paid" }).eq("gym_member_id", input.gym_member_id).eq("status", "active");
+  const key = newClientKey();
+  await exec(() => supabase().from("payments").insert({ ...input, gym_id: gymId, client_key: key }));
+  await exec(() => supabase().from("memberships").update({ payment_status: "paid" }).eq("gym_member_id", input.gym_member_id).eq("status", "active"));
 }
 
 // ============ LEADS ============
@@ -823,18 +866,19 @@ export async function listLeads(): Promise<Lead[]> {
   return data as Lead[];
 }
 
-export async function createLead(input: { first_name: string; last_name: string; email: string; phone: string; source: Lead["source"]; notes: string }): Promise<void> {
+export async function createLead(input: { first_name: string; last_name: string; email: string; phone: string; source: Lead["source"]; notes: string; estimated_value_cents?: number | null }): Promise<void> {
   if (isDemoMode) {
     state.leads.unshift({
       id: `l${Date.now()}`, first_name: input.first_name, last_name: input.last_name || null,
       email: input.email || null, phone: input.phone || null, source: input.source,
       status: "new", follow_up_date: null, notes: input.notes || null, created_at: new Date().toISOString(),
+      estimated_value_cents: input.estimated_value_cents ?? null,
     });
     return;
   }
   const gymId = await getMyGymId();
-  const { error } = await supabase().from("leads").insert({ ...input, gym_id: gymId });
-  if (error) throw error;
+  const key = newClientKey();
+  await exec(() => supabase().from("leads").insert({ ...input, gym_id: gymId, client_key: key }));
 }
 
 export async function setLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
@@ -843,7 +887,189 @@ export async function setLeadStatus(leadId: string, status: LeadStatus): Promise
     if (l) l.status = status;
     return;
   }
-  await supabase().from("leads").update({ status }).eq("id", leadId);
+  await exec(() => supabase().from("leads").update({ status }).eq("id", leadId));
+}
+
+// ============ TIMELINE / NOTES / TASKS / ATTACHMENTS (Twenty transfer, 0010) ============
+
+// Activity timeline for one member, newest first, max 50 per page.
+export async function memberTimeline(memberId: string, page = 0): Promise<TimelineEvent[]> {
+  if (isDemoMode) {
+    // Derived on the fly from existing demo data so the timeline isn't empty.
+    const events: TimelineEvent[] = [];
+    for (const c of state.checkIns.filter((x) => x.gym_member_id === memberId)) {
+      events.push({ id: `t-${c.id}`, gym_id: "g1", happens_at: c.checked_in_at, event_type: "check_in", title: "Checked in", properties: { method: c.method }, actor_member_id: null, target_member_id: memberId, target_lead_id: null });
+    }
+    for (const p of state.payments.filter((x) => x.gym_member_id === memberId)) {
+      events.push({ id: `t-${p.id}`, gym_id: "g1", happens_at: p.paid_at, event_type: "payment", title: "Payment received", properties: { amount_cents: p.amount_cents, method: p.method }, actor_member_id: null, target_member_id: memberId, target_lead_id: null });
+    }
+    for (const n of state.notes.filter((x) => x.member_id === memberId)) {
+      events.push({ id: `t-${n.id}`, gym_id: "g1", happens_at: n.created_at, event_type: "note_added", title: "Note added", properties: null, actor_member_id: n.author_id, target_member_id: memberId, target_lead_id: null });
+    }
+    return events.sort((a, b) => b.happens_at.localeCompare(a.happens_at)).slice(page * 50, (page + 1) * 50);
+  }
+  const { data, error } = await supabase()
+    .from("timeline_events")
+    .select("*")
+    .eq("target_member_id", memberId)
+    .order("happens_at", { ascending: false })
+    .range(page * 50, (page + 1) * 50 - 1);
+  if (error) throw new Error(error.message);
+  return data as TimelineEvent[];
+}
+
+// Coach notes on a member (reuses the existing coach_notes table — no new notes table).
+export async function listMemberNotes(memberId: string): Promise<CoachNote[]> {
+  if (isDemoMode) return state.notes.filter((n) => n.member_id === memberId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const { data, error } = await supabase()
+    .from("coach_notes")
+    .select("*, author:gym_members!coach_notes_author_id_fkey(first_name, last_name)")
+    .eq("member_id", memberId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error(error.message);
+  return (data as Array<Record<string, unknown> & { author?: { first_name: string; last_name: string | null } | null }>).map((r) => ({
+    id: r.id as string, member_id: r.member_id as string, author_id: (r.author_id as string | null) ?? null,
+    author_name: r.author ? `${r.author.first_name} ${r.author.last_name ?? ""}`.trim() : "",
+    body: r.body as string, visibility: r.visibility as CoachNote["visibility"], created_at: r.created_at as string,
+  }));
+}
+
+export async function addMemberNote(memberId: string, body: string, visibility: CoachNote["visibility"] = "staff"): Promise<void> {
+  const text = body.trim();
+  if (!text) throw new Error("Note is empty.");
+  if (isDemoMode) {
+    state.notes.unshift({ id: `n${Date.now()}`, member_id: memberId, author_id: "m6", author_name: "You", body: text, visibility, created_at: new Date().toISOString() });
+    return;
+  }
+  const gymId = await getMyGymId();
+  const authorId = await currentMemberId();
+  await exec(() => supabase().from("coach_notes").insert({ gym_id: gymId, member_id: memberId, author_id: authorId, body: text, visibility }));
+}
+
+// Tasks (Twenty Task): staff to-dos, optionally targeted at a member or lead.
+export async function listTasks(target?: { memberId?: string; leadId?: string }): Promise<GymTask[]> {
+  if (isDemoMode) {
+    return state.tasks
+      .filter((t) => (!target?.memberId || t.target_member_id === target.memberId) && (!target?.leadId || t.target_lead_id === target.leadId))
+      .sort((a, b) => (a.status === "done" ? 1 : 0) - (b.status === "done" ? 1 : 0) || (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999"));
+  }
+  let q = supabase()
+    .from("tasks")
+    .select("*, assignee:gym_members!tasks_assignee_member_id_fkey(first_name, last_name)")
+    .is("deleted_at", null)
+    .order("status")
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .limit(50);
+  if (target?.memberId) q = q.eq("target_member_id", target.memberId);
+  if (target?.leadId) q = q.eq("target_lead_id", target.leadId);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data as Array<Record<string, unknown> & { assignee?: { first_name: string; last_name: string | null } | null }>).map((r) => ({
+    id: r.id as string, gym_id: r.gym_id as string, title: r.title as string, body: (r.body as string | null) ?? null,
+    due_at: (r.due_at as string | null) ?? null, status: r.status as TaskStatus,
+    assignee_member_id: (r.assignee_member_id as string | null) ?? null,
+    assignee_name: r.assignee ? `${r.assignee.first_name} ${r.assignee.last_name ?? ""}`.trim() : "",
+    target_member_id: (r.target_member_id as string | null) ?? null,
+    target_lead_id: (r.target_lead_id as string | null) ?? null,
+    created_at: r.created_at as string,
+  }));
+}
+
+export async function createTask(input: { title: string; due_at?: string | null; target_member_id?: string | null; target_lead_id?: string | null }): Promise<void> {
+  const title = input.title.trim();
+  if (!title) throw new Error("Task needs a title.");
+  if (isDemoMode) {
+    state.tasks.unshift({
+      id: `task${Date.now()}`, gym_id: "g1", title, body: null, due_at: input.due_at ?? null, status: "todo",
+      assignee_member_id: null, target_member_id: input.target_member_id ?? null, target_lead_id: input.target_lead_id ?? null,
+      created_at: new Date().toISOString(),
+    });
+    return;
+  }
+  const gymId = await getMyGymId();
+  const creator = await currentMemberId();
+  const key = newClientKey();
+  await exec(() => supabase().from("tasks").insert({
+    gym_id: gymId, title, due_at: input.due_at ?? null, created_by: creator, client_key: key,
+    target_member_id: input.target_member_id ?? null, target_lead_id: input.target_lead_id ?? null,
+  }));
+}
+
+export async function setTaskStatus(taskId: string, status: TaskStatus): Promise<void> {
+  if (isDemoMode) {
+    const t = state.tasks.find((x) => x.id === taskId);
+    if (t) t.status = status;
+    return;
+  }
+  await exec(() => supabase().from("tasks").update({ status }).eq("id", taskId));
+}
+
+// Attachments (Twenty Attachment): file metadata + private Storage object.
+export async function listAttachments(memberId: string): Promise<Attachment[]> {
+  if (isDemoMode) return state.attachments.filter((a) => a.target_member_id === memberId);
+  const { data, error } = await supabase()
+    .from("attachments")
+    .select("*")
+    .eq("target_member_id", memberId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error(error.message);
+  return data as Attachment[];
+}
+
+export async function uploadAttachment(memberId: string, file: File, category: Attachment["category"]): Promise<void> {
+  if (isDemoMode) {
+    state.attachments.unshift({
+      id: `att${Date.now()}`, gym_id: "g1", name: file.name, storage_path: `demo/${file.name}`,
+      mime_type: file.type || null, size_bytes: file.size, category,
+      target_member_id: memberId, target_lead_id: null, created_at: new Date().toISOString(),
+    });
+    return;
+  }
+  const gymId = await getMyGymId();
+  if (!gymId) throw new Error("Could not determine your gym.");
+  const path = `${gymId}/${memberId}/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, "_")}`;
+  const { error: upErr } = await supabase().storage.from("attachments").upload(path, file);
+  if (upErr) throw new Error(upErr.message);
+  const author = await currentMemberId();
+  const key = newClientKey();
+  await exec(() => supabase().from("attachments").insert({
+    gym_id: gymId, name: file.name, storage_path: path, mime_type: file.type || null,
+    size_bytes: file.size, category, author_member_id: author, target_member_id: memberId, client_key: key,
+  }));
+}
+
+export async function attachmentUrl(a: Attachment): Promise<string | null> {
+  if (isDemoMode) return null;
+  const { data } = await supabase().storage.from("attachments").createSignedUrl(a.storage_path, 60 * 10);
+  return data?.signedUrl ?? null;
+}
+
+// Convert a won lead into a member in one step (kanban guardrail).
+export async function convertLeadToMember(lead: Lead): Promise<GymMember> {
+  const member = await createMember({
+    first_name: lead.first_name, last_name: lead.last_name ?? "",
+    email: lead.email ?? "", phone: lead.phone ?? "",
+  });
+  if (isDemoMode) {
+    const l = state.leads.find((x) => x.id === lead.id);
+    if (l) l.status = "converted";
+    return member;
+  }
+  await exec(() => supabase().from("leads").update({ status: "converted", converted_member_id: member.id }).eq("id", lead.id));
+  return member;
+}
+
+// Persist kanban drag ordering (Twenty position pattern).
+export async function setLeadPosition(leadId: string, status: LeadStatus, position: number): Promise<void> {
+  if (isDemoMode) {
+    const l = state.leads.find((x) => x.id === leadId);
+    if (l) l.status = status;
+    return;
+  }
+  await exec(() => supabase().from("leads").update({ status, position }).eq("id", leadId));
 }
 
 // ============ SETTINGS ============
@@ -865,5 +1091,5 @@ export async function saveSettings(s: GymSettings): Promise<void> {
     state.settings = { ...s };
     return;
   }
-  await supabase().from("gyms").update(s).neq("id", "");
+  await exec(() => supabase().from("gyms").update(s).neq("id", ""));
 }

@@ -50,7 +50,20 @@
 ### Infrastructure & Compliance (Phase 1, invisible but required) **[added — section missing from draft]**
 
 - ✅ **backend RLS workflow tests** (pgTAP — `supabase/tests/rls_workflows.test.sql`, run via `supabase test db`): every write path asserted allowed-for-staff / denied-for-members, so demo-vs-real gaps are caught before shipping.
+- ✅ **Playwright e2e suite** (`apps/web/e2e/`, `pnpm test:e2e`): 14 browser tests over the real UI in demo mode — members add/archive/restore, filter chips, CSV validation, Fighter Card (timeline/notes/tasks/attendance), leads convert guardrail, class deactivate/cancel modals, payments. All passing.
+- ✅ **Resilience layer (VERSION 2):** exponential-backoff retry (1s/2s/4s on 429/502/503 + network drops) on every mutation; idempotency `client_key` on creations (double-click/retry can't duplicate); global toasts; `useSubmit` double-submit guard; friendly DB-error messages.
+- ✅ **DestructiveActionModal:** all 4 destructive actions (archive member, deactivate class, cancel session, remove coach role) go through one modal; archive + deactivate require typing the name.
+- ✅ **Server-side pagination:** members list fetches max 50/page with count + pager; payments capped at 200; filter presets (All / Past due / New this month) pushed to the DB.
 - ⬜ Notification queue with retry · membership-expiry cron + silent-failure alerting · CI/CD pipeline · staging environment · error monitoring · uptime checks · verified backups · privacy policy + 72 h breach procedure + Supabase DPA (Law 25) · i18n scaffolding day 1 (strings English-only) · onboarding email sequence with app-store deep links · "app day" activation playbook.
+
+### Twenty-transfer (schema + Fighter Card) — 2026-07-06
+
+- ✅ **Migration 0010 (file ready):** `timeline_events` (auto-logged by triggers on check-ins/payments/member/membership changes + backfilled), `tasks`, `attachments` (+ private `attachments` Storage bucket), full-text `search_vector` on members/leads, `leads.position` + `estimated_value_cents`, `client_key` idempotency columns, `created_by` audit on members.
+- ✅ **Migration 0009 (file ready):** advisors-driven hardening — search_path pinned on all helper functions, `auth_member_id` revoked from anon, cron_job_log policy, 36 FK covering indexes, ALL RLS policies consolidated (one per table/action, `TO authenticated`, initplan-safe).
+- ✅ **Fighter Card** (`/members/view`): 3-column record page — profile + boxing fields + big green/red MEMBERSHIP CURRENT / PAST DUE badge · Timeline/Notes/Tasks/Files tabs · quick actions (log attendance, record payment, send invite) + QR + attendance stats.
+- ✅ **Leads Kanban upgrades:** per-column $/mo aggregates, estimated-value on leads, convert-to-member guardrail (moving into Converted creates the member, pending-unpaid per D-24, links the lead).
+- ✅ **CSV import validation:** per-row checks (invalid email/phone) listed before import; bad rows never inserted.
+- ⬜ NOT applied to the live DB yet: 0009 (partially — functions chunk applied) + 0010. See README TO DEPLOY.
 
 ---
 
