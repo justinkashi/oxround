@@ -35,10 +35,13 @@ export async function GET(request: Request) {
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (error) return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+    // They just activated — mark their member row joined (idempotent; no-op if not a member).
+    await supabase.rpc("mark_member_activated");
     return NextResponse.redirect(`${origin}/`);
   }
 
   const { error } = await supabase.auth.exchangeCodeForSession(code!);
   if (error) return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+  await supabase.rpc("mark_member_activated");
   return NextResponse.redirect(`${origin}/`);
 }

@@ -187,6 +187,7 @@ export const en = {
     paymentStatus: { paid: "paid", pending: "pending", overdue: "overdue", comped: "comped" } as Record<string, string>,
     memberStatus: { active: "active", inactive: "inactive", suspended: "suspended", archived: "archived" } as Record<string, string>,
     role: { owner: "owner", manager: "manager", coach: "coach", receptionist: "receptionist", member: "member", trial: "trial" } as Record<string, string>,
+    appJoin: { not_invited: "Not invited", invited: "Pending", active: "Joined" } as Record<string, string>,
     bookingStatus: { booked: "booked", canceled: "canceled", waitlisted: "waitlisted", attended: "attended", no_show: "no-show" } as Record<string, string>,
     leadStatus: { new: "New", contacted: "Contacted", trial_scheduled: "Trial booked", trialing: "Trialing", converted: "Converted", lost: "Lost" } as Record<string, string>,
     leadSource: {

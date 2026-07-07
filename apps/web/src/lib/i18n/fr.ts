@@ -186,6 +186,7 @@ export const fr: Messages = {
     paymentStatus: { paid: "payé", pending: "en attente", overdue: "en retard", comped: "gratuit" },
     memberStatus: { active: "actif", inactive: "inactif", suspended: "suspendu", archived: "archivé" },
     role: { owner: "propriétaire", manager: "gestionnaire", coach: "entraîneur", receptionist: "réception", member: "membre", trial: "essai" },
+    appJoin: { not_invited: "Non invité", invited: "En attente", active: "Inscrit(e)" } as Record<string, string>,
     bookingStatus: { booked: "réservé", canceled: "annulé", waitlisted: "liste d'attente", attended: "présent", no_show: "absent" },
     leadStatus: { new: "Nouveau", contacted: "Contacté", trial_scheduled: "Essai réservé", trialing: "En essai", converted: "Converti", lost: "Perdu" },
     leadSource: {

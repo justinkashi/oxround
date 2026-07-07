@@ -120,6 +120,11 @@ export default function CoachesPage() {
               {c.roles.map((r) => (
                 <span key={r} className={`rounded px-2 py-0.5 text-xs font-medium ${r === "owner" ? "bg-neutral-900 text-white" : r === "coach" ? "bg-blue-100 text-blue-700" : "bg-neutral-100 text-neutral-600"}`}>{t.labels.role[r] ?? r}</span>
               ))}
+              {(() => {
+                const s = c.invite_status ?? "not_invited";
+                const cls: Record<string, string> = { not_invited: "bg-neutral-100 text-neutral-500", invited: "bg-yellow-100 text-yellow-700", active: "bg-green-100 text-green-700" };
+                return <span className={`rounded px-2 py-0.5 text-xs font-medium ${cls[s] ?? cls.not_invited}`}>{t.labels.appJoin[s] ?? s}</span>;
+              })()}
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
               <span>{c.phone ?? ""}</span>

@@ -15,6 +15,7 @@ export interface GymMember {
   date_of_birth?: string | null;
   roles: Role[];
   status: MemberStatus;
+  invite_status?: "not_invited" | "invited" | "active";
   joined_at: string | null;
   emergency_contact: { name: string; phone: string; relation: string } | null;
   created_at?: string;

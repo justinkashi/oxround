@@ -265,6 +265,7 @@ export default function MembersPage() {
                       {m.first_name} {m.last_name}
                     </Link>
                     {m.roles.includes("coach") && <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{t.members.coachBadge}</span>}
+                    <AppJoinBadge status={m.invite_status} />
                   </td>
                   <td className="px-4 py-2">{s?.plan_name ?? "—"}</td>
                   <td className="px-4 py-2"><PaymentBadge status={s?.payment_status} /></td>
@@ -381,6 +382,17 @@ function EditMemberModal({ member, busy, error, onSave, onCancel }: {
       </div>
     </div>
   );
+}
+
+function AppJoinBadge({ status }: { status?: string }) {
+  const t = useT();
+  const s = status ?? "not_invited";
+  const colors: Record<string, string> = {
+    not_invited: "bg-neutral-100 text-neutral-500",
+    invited: "bg-yellow-100 text-yellow-700",
+    active: "bg-green-100 text-green-700",
+  };
+  return <span className={`ml-2 rounded px-1.5 py-0.5 text-xs font-medium ${colors[s] ?? colors.not_invited}`}>{t.labels.appJoin[s] ?? s}</span>;
 }
 
 function PaymentBadge({ status }: { status?: string }) {

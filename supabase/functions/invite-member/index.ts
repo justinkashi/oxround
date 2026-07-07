@@ -27,15 +27,15 @@ function claimsFromToken(token: string): { roles: string[]; gymId: string | null
   }
 }
 
-// Link a gym_members row to an auth user. Returns an error message, or null on success.
-// Every user_id write goes through here (or is error-checked inline) so a failed link
-// surfaces as a real error instead of a silent "invite sent" that dead-ends at /no-access.
-async function linkMember(
+// Update a gym_members row (user_id link and/or invite_status). Returns an error message,
+// or null on success. Every such write goes through here (or is error-checked inline) so a
+// failed link surfaces as a real error instead of a silent "invite sent" that dead-ends.
+async function markMember(
   admin: ReturnType<typeof createClient>,
   memberId: string,
-  userId: string | null,
+  fields: Record<string, unknown>,
 ): Promise<string | null> {
-  const { error } = await admin.from("gym_members").update({ user_id: userId }).eq("id", memberId);
+  const { error } = await admin.from("gym_members").update(fields).eq("id", memberId);
   return error?.message ?? null;
 }
 
@@ -119,12 +119,13 @@ Deno.serve(async (req) => {
         }
         const activated = !!existing.last_sign_in_at || !!existing.email_confirmed_at;
         if (activated) {
-          if (!member.user_id) {
-            const linkErr = await linkMember(admin, member.id, existing.id);
-            if (linkErr) {
-              console.error("invite-member: link of active user failed:", linkErr);
-              return json({ error: `couldn't link their existing account: ${linkErr}` }, 500);
-            }
+          const fields = member.user_id
+            ? { invite_status: "active" }
+            : { user_id: existing.id, invite_status: "active" };
+          const linkErr = await markMember(admin, member.id, fields);
+          if (linkErr) {
+            console.error("invite-member: mark active failed:", linkErr);
+            return json({ error: `couldn't link their existing account: ${linkErr}` }, 500);
           }
           return json({ ok: true, note: "no email sent — they already have an active account and can just log in" });
         }
@@ -146,7 +147,7 @@ Deno.serve(async (req) => {
           return json({ error: `email provider error: ${reErr.message}` }, 502);
         }
         if (reinvited?.user?.id) {
-          const linkErr = await linkMember(admin, member.id, reinvited.user.id);
+          const linkErr = await markMember(admin, member.id, { user_id: reinvited.user.id, invite_status: "invited" });
           if (linkErr) {
             console.error("invite-member: link after re-invite failed:", linkErr);
             return json({ error: `invite emailed but linking the account failed — retry: ${linkErr}` }, 500);
@@ -158,8 +159,11 @@ Deno.serve(async (req) => {
       return json({ error: `email provider error: ${error.message}` }, 502);
     }
 
-    if (invited?.user?.id && !member.user_id) {
-      const linkErr = await linkMember(admin, member.id, invited.user.id);
+    if (invited?.user?.id) {
+      const fields = member.user_id
+        ? { invite_status: "invited" }
+        : { user_id: invited.user.id, invite_status: "invited" };
+      const linkErr = await markMember(admin, member.id, fields);
       if (linkErr) {
         console.error("invite-member: link after invite failed:", linkErr);
         return json({ error: `invite emailed but linking the account failed — retry: ${linkErr}` }, 500);
