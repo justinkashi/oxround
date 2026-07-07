@@ -1,7 +1,7 @@
 # OxRound — Master Feature List
 
 > THE single source of truth for every feature. Merged from your draft + every repo document (BUILD_PLAN, GAP_AUDIT, ROADMAP, logs.md, Amir's list, ONBOARDING, MAINTENANCE, archive PDFs, COMPETITORS).
-> Status: ✅ built in localhost demo · ⬜ not built. Items marked **[added]** were missing from the draft.
+> Status: ✅ built · ⬜ not built. Items marked **[added]** were missing from the draft.
 
 ---
 
@@ -33,7 +33,7 @@
 ### Member App & Kiosk (Mobile/Tablet)
 
 > ✅ **Web preview of the member app is live at `/app`** (phone-framed, real shared data, doors splash, booking works).
-> **Direction (D-19):** ship the member app as a WEBSITE/PWA first (wire this preview to real member logins + data), native iOS/Android later. Statuses below track the real member-facing app; "(preview ✅)" = built in the demo, needs real-data wiring.
+> **Direction (D-19):** ship the member app as a WEBSITE/PWA first (wire this preview to real member logins + data), native iOS/Android later. Statuses below track the real member-facing app; "(preview ✅)" = built as the web preview, needs real-data wiring.
 
 - ⬜ **Splash & Login:** doors-opening owner-photo splash *(preview ✅)*, welcome flow, email OTP login.
 - ⬜ **Home:** today's classes, upcoming bookings, membership status, announcements feed *(preview ✅)*.
@@ -49,8 +49,8 @@
 
 ### Infrastructure & Compliance (Phase 1, invisible but required) **[added — section missing from draft]**
 
-- ✅ **backend RLS workflow tests** (pgTAP — `supabase/tests/rls_workflows.test.sql`, run via `supabase test db`): every write path asserted allowed-for-staff / denied-for-members, so demo-vs-real gaps are caught before shipping.
-- ✅ **Playwright e2e suite** (`apps/web/e2e/`, `pnpm test:e2e`): 14 browser tests over the real UI in demo mode — members add/archive/restore, filter chips, CSV validation, Fighter Card (timeline/notes/tasks/attendance), leads convert guardrail, class deactivate/cancel modals, payments. All passing.
+- ✅ **backend RLS workflow tests** (pgTAP — `supabase/tests/rls_workflows.test.sql`, run via `supabase test db`): every write path asserted allowed-for-staff / denied-for-members, so staff-vs-member access gaps are caught before shipping.
+- ✅ **Playwright e2e suite** (`apps/web/e2e/`, `pnpm test:e2e`): 14 browser tests over the UI — members add/archive/restore, filter chips, CSV validation, Fighter Card (timeline/notes/tasks/attendance), leads convert guardrail, class deactivate/cancel modals, payments. All passing.
 - ✅ **Resilience layer (VERSION 2):** exponential-backoff retry (1s/2s/4s on 429/502/503 + network drops) on every mutation; idempotency `client_key` on creations (double-click/retry can't duplicate); global toasts; `useSubmit` double-submit guard; friendly DB-error messages.
 - ✅ **DestructiveActionModal:** all 4 destructive actions (archive member, deactivate class, cancel session, remove coach role) go through one modal; archive + deactivate require typing the name.
 - ✅ **Server-side pagination:** members list fetches max 50/page with count + pager; payments capped at 200; filter presets (All / Past due / New this month) pushed to the DB.

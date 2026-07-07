@@ -1,0 +1,16 @@
+What your docs already say
+AI appears in four places: LLM owner co-pilot (text-to-SQL) and AI training recommendations in ROADMAP Phase 3; autonomous lead-conversion agent and predictive churn modeling post-Series A; and COMPETITORS.md flags GymWise.ai — a funded startup selling only churn prediction + automated outreach as a layer on top of existing gym CRMs — as validation that retention intelligence should lead your demos.
+What the market is doing
+
+Gym-specific: PushPress went "AI-first" and shipped Pressly, a copilot that answers questions about your gym's data. 1club is AI-native (churn prediction + 24/7 member assistant). A whole category of AI receptionists for gyms exists because gyms miss booking calls during 5–8am/pm rushes and ~80% of callers won't leave voicemail.
+General CRM: HubSpot Breeze and Salesforce Agentforce converge on the same three things: auto-capture data (kill manual entry), score/prioritize leads, and draft/execute follow-ups.
+What users actually value: across sources, AI that removes admin toil and drafts follow-ups gets used; dashboard-decoration "AI" doesn't. For gyms specifically, the wins are fast lead response and personalized (not blanket) at-risk outreach.
+
+How I'd add AI to OxRound, in order
+1. Retention copilot (build first). You already have the at-risk dashboard. The AI layer: for each flagged member, draft a personalized win-back text/email using their actual history — "Maria, you were coming to Tuesday sparring 3x/week and haven't been in 12 days." Owner reviews and taps send. This is exactly what GymWise sells standalone, and your first-party check-in data is the moat they don't have. Cheapest to build: one Claude API call in a Supabase Edge Function.
+2. "Ask your gym" copilot. Already planned (Phase 3 text-to-SQL). Owners ask "who attended 3+ times last week but hasn't paid?" in plain language. This is Pressly's pitch — it's becoming table stakes. Security note: generated SQL must execute under the owner's JWT so RLS still enforces tenancy; never a service-role connection.
+3. AI lead responder. Answers trial inquiries from the website widget/SMS within seconds, answers schedule/pricing questions, books the trial class. Pairs with the Phase 3 website widget — build them together. This is where the strongest revenue evidence is, but it's a bigger, riskier build (an AI misquoting prices to a prospect is a real failure mode), so it's third.
+4. Drafting everywhere. Small, cheap wins: draft birthday messages, class-cancellation notices, and email campaigns in the gym's voice; summarize a member's notes/history before the owner calls them.
+Skip: generic chatbots, "AI insights" cards that restate charts, and anything requiring custom ML models — the research consistently shows small-business users see these as gimmicks, and rule-based flags (attendance drop >X%) beat a black-box model at your data scale anyway.
+One constraint to log: LLM API calls send member PII to a third party, which interacts with Law 25 — use minimal fields per call and a provider with zero-data-retention terms. Worth a DECISIONS.md entry when you build feature 1.
+Sources: COMPETITORS.md, ROADMAP.md, PushPress AI-first, Pressly announcement, 1club AI gym guide, HubSpot vs Salesforce AI 2026, Zapier AI CRM review, Eden AI receptionist for gyms, Zen Planner churn playbook, Keepme lead management

@@ -19,7 +19,7 @@ Known free-tier limits (accepted): Supabase pauses after **7 days of no database
 - [x] 2.1 supabase.com → **New project**. Name: `oxround`. **Region: Canada Central (ca-central-1)** — non-negotiable, Law 25 (docs/STACK_REVIEW.md R5). Plan: Free. Generate a strong database password and save it in your password manager — you'll need it in 2.3.
 - [x] 2.2 Install the Supabase CLI on your Mac: `brew install supabase/tap/supabase` (or without Homebrew: `npm i -g supabase`). Then `supabase login` — opens your browser.
 - [x] 2.3 In your terminal, at the repo root: `supabase link --project-ref <REF>` — the REF is the 20-character code in your project's URL (`supabase.com/dashboard/project/<REF>`). It asks for the database password from 2.1.
-- [x] 2.4 `supabase db push` — applies all three migrations (schema + RLS + token hook). **Never run `seed.sql` on this project** — it contains demo check-in tokens.
+- [x] 2.4 `supabase db push` — applies all three migrations (schema + RLS + token hook). **Never run `seed.sql` on this project** — it contains seed check-in tokens (test data only).
 - [x] 2.5 `supabase functions deploy check-in` — deploys the check-in Edge Function. (The `auth-hook` Edge Function is superseded by migration 0003's Postgres function — faster, no webhook secret. Don't deploy it; the folder stays in the repo as history.)
 - [x] 2.6 Dashboard → **Authentication → Hooks** → **Customize Access Token (JWT) Claims** → Hook type: **Postgres** → schema `public`, function `custom_access_token_hook` → Create hook. ⚠️ Skipping this breaks everything silently: it's what puts `gym_id` + roles into the login token, and every RLS rule depends on it.
 - [x] 2.7 Dashboard → **Storage** → create bucket `announcements` (toggle **Public** ON) and bucket `waivers` (Public OFF).
@@ -31,11 +31,11 @@ Known free-tier limits (accepted): Supabase pauses after **7 days of no database
 
 - [x] 3.1 vercel.com → **Add New… → Project** → Import the `oxround` GitHub repo.
 - [x] 3.2 **Root Directory: `apps/web`** (it's a monorepo — this points Vercel at the Next.js app; it still auto-detects pnpm from the root lockfile). Framework preset: Next.js (auto). Leave build settings default.
-- [x] 3.3 **Environment variables: add NONE for now.** No Supabase keys ⇒ the site runs in demo mode ⇒ you get a live, clickable, fake-data demo at a shareable URL. This is intentional: with the keys set, every page would show empty tables because the real login (Step 5) isn't built yet.
+- [x] 3.3 The first deploy went up before the backend was wired (a scaffolding milestone, now superseded). **For production, set `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (from Step 2.9) under Production + Preview — see Step 5.3** — so every page runs against the live Supabase backend and the real magic-link login (Step 5.1, built).
 - [x] 3.4 Click **Deploy**. First build takes 2–3 min. You get `https://oxround-….vercel.app`.
 - [x] 3.5 Smoke test the URL on your phone: dashboard, members, classes grid, a session roster, `/app` preview with the doors splash.
 
-**🎉 Milestone: a shareable live demo.** Every `git push` to main now auto-deploys.
+**🎉 Milestone: auto-deploy is live** — every `git push` to main deploys to Vercel. Complete Step 5 (env vars + auth config) to run on real production data.
 
 ### Step 4 — Domain (REQUIRED before Step 5.4 — Resend can only email real recipients from a domain you own and verify)
 
@@ -48,7 +48,7 @@ Known free-tier limits (accepted): Supabase pauses after **7 days of no database
 
 ### Step 5 — Real auth = the go-live gate (the remaining CODE work, ~3–5 days)
 
-Everything above ships a demo. Real G1 data requires:
+Steps 1–4 stand up the infrastructure. Connecting real G1 data requires:
 
 - [x] 5.1 Build B1 (below): magic-link login with `@supabase/ssr`, session guard on all pages, logout. The mock login page at `/login` is the UI starting point.
 - [ ] 5.2 **Auth URL config (classic gotcha):** Supabase → Authentication → URL Configuration → set **Site URL** to your Vercel URL (later `app.oxround.com`) and add `http://localhost:3000/**` to **Redirect URLs**. Skip this and every magic-link email redirects to localhost — logins mysteriously fail for anyone but you.
@@ -78,7 +78,7 @@ Everything above ships a demo. Real G1 data requires:
 ## Phase A — Backend live (half a day, config only)
 
 - [ ] A1. Create Supabase **Pro** project in **`ca-central-1`** (STACK_REVIEW). Sign the DPA (Law 25), file a copy.
-- [ ] A2. `supabase link --project-ref <ref>` then `supabase db push` — applies migrations 0001 + 0002. Do NOT run seed.sql in prod (it contains demo tokens); create the G1 gym row manually or via a prod-safe seed.
+- [ ] A2. `supabase link --project-ref <ref>` then `supabase db push` — applies migrations 0001 + 0002. Do NOT run seed.sql in prod (it contains seed/test tokens); create the G1 gym row manually or via a prod-safe seed.
 - [ ] A3. Create Storage buckets: `announcements` (public-read), `waivers` (private).
 - [ ] A4. Deploy Edge Functions: `supabase functions deploy check-in auth-hook`. Set secrets (`supabase secrets set`). Enable `auth-hook` as the **Custom Access Token hook** in Auth settings (this injects gym_id + roles — RLS depends on it).
 - [ ] A5. Auth config: enable email provider; magic link for CRM; custom SMTP via Resend (default Supabase SMTP is rate-limited to ~2/hr).
@@ -86,7 +86,7 @@ Everything above ships a demo. Real G1 data requires:
 ## Phase B — CRM live (the real work: ~3–5 days)
 
 - [ ] B1. **Build auth into the CRM** — login page (magic link), session handling via `@supabase/ssr`, route guard on all pages, logout. This is the only missing feature blocking go-live.
-- [ ] B2. Production-mode data layer: member creation generates raw token client-side → shows/prints QR **once** → stores SHA-256 only (already coded in `data.ts`, needs the print dialog). Gate demo mode behind `NODE_ENV !== 'production'`.
+- [ ] B2. Production-mode data layer: member creation generates raw token client-side → shows/prints QR **once** → stores SHA-256 only (already coded in `data.ts`, needs the print dialog). Remove the in-memory fallback data path so production only ever reads the live backend.
 - [ ] B3. `pnpm install` at repo root — **lockfile is stale**: it pins Next 14 from the pre-upgrade install; package.json targets Next 16. Reinstall, then `pnpm build` to verify locally.
 - [ ] B4. Push repo to GitHub (private). Confirm `.env*` never committed (.gitignore already covers).
 - [ ] B5. Vercel: import repo, root directory `apps/web`, set `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (prod + preview). Deploy.
@@ -100,7 +100,7 @@ Everything above ships a demo. Real G1 data requires:
 
 ## Step 6 — One login → two apps (owner CRM + member web app) + end-to-end QR (current plan — D-19, ~1–2 weeks)
 
-> Supersedes the native "Phase C" below for the pilot. One sign-in page routes by role: **owner/staff → CRM** (`/`), **member → member web app** (`/app`). The `/app` preview already has the member screens on shared demo data — this wires them to real per-member logins + data. The iPad check-in scanner is a tab inside the owner's CRM (no separate kiosk; the iPad is logged in as the gym, which sidesteps D-01). The verify-and-record `check-in` function is already deployed.
+> Supersedes the native "Phase C" below for the pilot. One sign-in page routes by role: **owner/staff → CRM** (`/`), **member → member web app** (`/app`). The `/app` preview already has the member screens on shared sample data — this wires them to real per-member logins + data. The iPad check-in scanner is a tab inside the owner's CRM (no separate kiosk; the iPad is logged in as the gym, which sidesteps D-01). The verify-and-record `check-in` function is already deployed.
 >
 > **Reused, already built:** roles are already stamped into the login token (migration 0003 `custom_access_token_hook`); the `check-in` function; RLS scaffolding; the CRM auth/guard; the whole `/app` preview UI.
 
