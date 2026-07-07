@@ -2,16 +2,30 @@
 // Coach management: staff list, promote member to coach, demote. (FEATURES: Coach Management)
 
 import { useEffect, useState } from "react";
-import { listCoaches, listMembers, setMemberRoles } from "@/lib/data";
+import {
+  createMember, inviteMemberEmail, listCoaches, listMembers, setMemberRoles, updateMember,
+  type MemberProfileUpdate,
+} from "@/lib/data";
 import type { GymMember } from "@/lib/types";
 import DestructiveActionModal from "@/components/DestructiveActionModal";
 import { useT } from "@/lib/i18n";
+
+type CoachForm = { first_name: string; last_name: string; email: string; phone: string };
+const blankCoachForm = (): CoachForm => ({ first_name: "", last_name: "", email: "", phone: "" });
 
 export default function CoachesPage() {
   const t = useT();
   const [coaches, setCoaches] = useState<GymMember[]>([]);
   const [members, setMembers] = useState<GymMember[]>([]);
   const [promoteId, setPromoteId] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [newForm, setNewForm] = useState(blankCoachForm);
+  const [newBusy, setNewBusy] = useState(false);
+  const [newError, setNewError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState<GymMember | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const load = async () => {
     const [c, m] = await Promise.all([listCoaches(), listMembers()]);
@@ -24,8 +38,52 @@ export default function CoachesPage() {
     const m = members.find((x) => x.id === promoteId);
     if (!m) return;
     await setMemberRoles(m.id, Array.from(new Set([...m.roles, "coach" as const])));
+    if (m.email) {
+      const result = await inviteMemberEmail(m.email);
+      setNotice(result.ok ? t.coaches.inviteSent(m.email) : t.coaches.inviteFailed(result.error ?? ""));
+    }
     setPromoteId("");
     load();
+  };
+
+  const createCoach = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setNewBusy(true);
+    setNewError(null);
+    setNotice(null);
+    try {
+      const coach = await createMember({ ...newForm, role: "coach" });
+      if (newForm.email) {
+        const result = await inviteMemberEmail(newForm.email);
+        setNotice(result.ok ? t.coaches.createdInviteSent(coach.first_name, newForm.email) : t.coaches.createdInviteFailed(coach.first_name, result.error ?? ""));
+      } else {
+        setNotice(t.coaches.createdNoEmail(coach.first_name));
+      }
+      setNewForm(blankCoachForm());
+      setShowNew(false);
+      load();
+    } catch (error) {
+      setNewError(error instanceof Error ? error.message : t.common.somethingWentWrong);
+    } finally {
+      setNewBusy(false);
+    }
+  };
+
+  const saveEdit = async (fields: MemberProfileUpdate) => {
+    if (!editing) return;
+    setEditBusy(true);
+    setEditError(null);
+    setNotice(null);
+    try {
+      await updateMember(editing.id, fields);
+      setNotice(t.coaches.updated(fields.first_name));
+      setEditing(null);
+      load();
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : t.common.somethingWentWrong);
+    } finally {
+      setEditBusy(false);
+    }
   };
 
   const [demoting, setDemoting] = useState<GymMember | null>(null);
@@ -46,8 +104,22 @@ export default function CoachesPage() {
             {promotable.map((m) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
           </select>
           <button disabled={!promoteId} onClick={promote} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{t.coaches.makeCoach}</button>
+          <button onClick={() => setShowNew(!showNew)} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white">{t.coaches.newCoach}</button>
         </div>
       </div>
+
+      {notice && <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800">{notice}</div>}
+
+      {showNew && (
+        <form onSubmit={createCoach} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2 md:grid-cols-5">
+          <input required placeholder={t.members.firstName} value={newForm.first_name} onChange={(event) => setNewForm({ ...newForm, first_name: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <input placeholder={t.members.lastName} value={newForm.last_name} onChange={(event) => setNewForm({ ...newForm, last_name: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <input type="email" placeholder={t.members.emailOptional} value={newForm.email} onChange={(event) => setNewForm({ ...newForm, email: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <input placeholder={t.members.phoneOptional} value={newForm.phone} onChange={(event) => setNewForm({ ...newForm, phone: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <button type="submit" disabled={newBusy || !newForm.first_name.trim()} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{newBusy ? t.common.saving : t.coaches.createCoach}</button>
+          {newError && <p className="rounded-md bg-red-50 p-2 text-sm text-red-700 sm:col-span-2 md:col-span-5">{newError}</p>}
+        </form>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {coaches.map((c) => (
@@ -68,9 +140,12 @@ export default function CoachesPage() {
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
               <span>{c.phone ?? ""}</span>
-              {c.roles.includes("coach") && !c.roles.includes("owner") && (
-                <button onClick={() => setDemoting(c)} className="text-red-600 hover:underline">{t.coaches.removeRole}</button>
-              )}
+              <div className="flex items-center gap-3">
+                <button onClick={() => { setEditing(c); setEditError(null); }} className="font-medium text-neutral-600 hover:text-brand">{t.common.edit}</button>
+                {c.roles.includes("coach") && !c.roles.includes("owner") && (
+                  <button onClick={() => setDemoting(c)} className="text-red-600 hover:underline">{t.coaches.removeRole}</button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -86,6 +161,57 @@ export default function CoachesPage() {
         onConfirm={async () => { if (demoting) await demote(demoting); }}
         onClose={() => setDemoting(null)}
       />
+
+      {editing && (
+        <EditCoachModal
+          coach={editing}
+          busy={editBusy}
+          error={editError}
+          onCancel={() => setEditing(null)}
+          onSave={saveEdit}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditCoachModal({ coach, busy, error, onCancel, onSave }: {
+  coach: GymMember;
+  busy: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onSave: (fields: MemberProfileUpdate) => void;
+}) {
+  const t = useT();
+  const [form, setForm] = useState({
+    first_name: coach.first_name,
+    last_name: coach.last_name ?? "",
+    email: coach.email ?? "",
+    phone: coach.phone ?? "",
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel} role="dialog" aria-modal="true">
+      <form
+        onSubmit={(event) => { event.preventDefault(); onSave(form); }}
+        className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="mb-4 text-lg font-bold">{t.coaches.editCoach}</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <input required placeholder={t.members.firstName} value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <input placeholder={t.members.lastName} value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <input type="email" placeholder={t.members.emailOptional} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" />
+          <input placeholder={t.members.phoneOptional} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" />
+        </div>
+        {error && <p className="mt-3 rounded-md bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">{t.common.cancel}</button>
+          <button type="submit" disabled={busy || !form.first_name.trim()} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50">
+            {busy ? t.common.saving : t.members.saveChanges}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

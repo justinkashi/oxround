@@ -528,7 +528,7 @@ export async function myQrActive(): Promise<{ active: boolean; reason?: string }
 
 // Owner/staff system notifications (Step 6F, D-23) — derived live from existing analytics.
 // At-risk members (drop-off) + overdue payments. No new tables needed.
-export type OwnerNotification = { id: string; kind: "at_risk" | "overdue"; text: string; href: string };
+export type OwnerNotification = { id: string; kind: "at_risk" | "overdue" | "trial_expired"; text: string; href: string };
 
 export async function getOwnerNotifications(): Promise<OwnerNotification[]> {
   const out: OwnerNotification[] = [];
@@ -547,6 +547,17 @@ export async function getOwnerNotifications(): Promise<OwnerNotification[]> {
     const s = await getMembership(m.id);
     if (s?.payment_status === "overdue") {
       out.push({ id: `due-${m.id}`, kind: "overdue", text: `${m.first_name} ${m.last_name ?? ""} — payment overdue`, href: `/members/view?id=${m.id}` });
+    }
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const leads = await listLeads();
+  for (const lead of leads) {
+    if (lead.status === "trialing" && lead.trial_end && lead.trial_end < today) {
+      out.push({
+        id: `trial-${lead.id}`, kind: "trial_expired",
+        text: `${lead.first_name} ${lead.last_name ?? ""} — trial expired`,
+        href: "/leads",
+      });
     }
   }
   return out;
@@ -751,6 +762,126 @@ export async function createClass(input: Omit<GymClass, "id" | "gym_id" | "is_ac
   if (rows.length) await exec(() => supabase().from("class_sessions").insert(rows));
 }
 
+export type ClassTemplateInput = Omit<GymClass, "id" | "gym_id" | "is_active">;
+
+function currentMonday(): Date {
+  const monday = new Date();
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function dateIso(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function coachDisplayName(coachId: string | null): string {
+  if (!coachId) return "—";
+  const coach = state.members.find((member) => member.id === coachId);
+  return coach ? `${coach.first_name} ${coach.last_name ?? ""}`.trim() : "—";
+}
+
+export async function updateClass(classId: string, input: ClassTemplateInput): Promise<void> {
+  const todayIso = dateIso(new Date());
+  const monday = currentMonday();
+
+  if (isDemoMode) {
+    const gymClass = state.classes.find((item) => item.id === classId);
+    if (!gymClass) return;
+    Object.assign(gymClass, input);
+    const futureSessions = state.sessions.filter((session) => session.class_id === classId && session.session_date >= todayIso);
+    const activeBookingSessionIds = new Set(
+      state.bookings
+        .filter((booking) => booking.status !== "canceled")
+        .map((booking) => booking.session_id),
+    );
+    for (const session of futureSessions) {
+      const day = new Date(`${session.session_date}T00:00:00`).getDay();
+      session.class_name = input.name;
+      session.start_time = input.start_time;
+      session.duration_mins = input.duration_mins;
+      session.capacity = input.capacity;
+      session.coach_id = input.coach_id;
+      session.coach_name = coachDisplayName(input.coach_id);
+      session.color = input.color;
+      if (!input.day_of_week.includes(day) && !activeBookingSessionIds.has(session.id)) {
+        session.status = "canceled";
+      }
+    }
+    for (let offset = 0; offset < 28; offset++) {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + offset);
+      if (!input.day_of_week.includes(day.getDay())) continue;
+      const sessionDate = dateIso(day);
+      const exists = state.sessions.some((session) => session.class_id === classId && session.session_date === sessionDate);
+      if (exists) continue;
+      state.sessions.push({
+        id: `ses${Date.now()}-${offset}`, class_id: classId, class_name: input.name,
+        session_date: sessionDate, start_time: input.start_time, duration_mins: input.duration_mins,
+        capacity: input.capacity, coach_id: input.coach_id, coach_name: coachDisplayName(input.coach_id),
+        status: "scheduled", color: input.color,
+      });
+    }
+    state.sessions.sort((left, right) => left.session_date.localeCompare(right.session_date) || left.start_time.localeCompare(right.start_time));
+    return;
+  }
+
+  const gymId = await getMyGymId();
+  if (!gymId) throw new Error("Could not determine your gym. Log out and back in.");
+  await exec(() => supabase().from("classes").update(input).eq("id", classId));
+  const { data: futureRows, error: sessionsError } = await supabase()
+    .from("class_sessions")
+    .select("id, session_date")
+    .eq("class_id", classId)
+    .gte("session_date", todayIso);
+  if (sessionsError) throw new Error(sessionsError.message);
+  const future = (futureRows ?? []) as Array<{ id: string; session_date: string }>;
+  const futureIds = future.map((session) => session.id);
+  const activeBookingSessionIds = new Set<string>();
+  if (futureIds.length) {
+    const { data: bookings, error: bookingsError } = await supabase()
+      .from("class_bookings")
+      .select("session_id")
+      .in("session_id", futureIds)
+      .neq("status", "canceled");
+    if (bookingsError) throw new Error(bookingsError.message);
+    for (const booking of (bookings ?? []) as Array<{ session_id: string }>) activeBookingSessionIds.add(booking.session_id);
+  }
+  const obsoleteIds = future
+    .filter((session) => {
+      const day = new Date(`${session.session_date}T00:00:00`).getDay();
+      return !input.day_of_week.includes(day) && !activeBookingSessionIds.has(session.id);
+    })
+    .map((session) => session.id);
+  const remainingIds = futureIds.filter((id) => !obsoleteIds.includes(id));
+  if (remainingIds.length) {
+    await exec(() => supabase().from("class_sessions").update({
+      start_time: input.start_time,
+      duration_mins: input.duration_mins,
+      capacity: input.capacity,
+      coach_id: input.coach_id,
+    }).in("id", remainingIds));
+  }
+  if (obsoleteIds.length) {
+    await exec(() => supabase().from("class_sessions").update({ status: "canceled" }).in("id", obsoleteIds));
+  }
+  const existingDates = new Set(future.map((session) => session.session_date));
+  const rows: Array<Record<string, unknown>> = [];
+  for (let offset = 0; offset < 28; offset++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + offset);
+    if (!input.day_of_week.includes(day.getDay())) continue;
+    const sessionDate = dateIso(day);
+    if (existingDates.has(sessionDate)) continue;
+    rows.push({
+      gym_id: gymId, class_id: classId, session_date: sessionDate,
+      start_time: input.start_time, duration_mins: input.duration_mins, capacity: input.capacity,
+      coach_id: input.coach_id, status: "scheduled",
+    });
+  }
+  if (rows.length) await exec(() => supabase().from("class_sessions").insert(rows));
+}
+
 export async function deactivateClass(classId: string): Promise<void> {
   if (isDemoMode) {
     const c = state.classes.find((x) => x.id === classId);
@@ -923,7 +1054,7 @@ export async function createLead(input: { first_name: string; last_name: string;
     state.leads.unshift({
       id: `l${Date.now()}`, first_name: input.first_name, last_name: input.last_name || null,
       email: input.email || null, phone: input.phone || null, source: input.source,
-      status: "new", follow_up_date: null, notes: input.notes || null, created_at: new Date().toISOString(),
+      status: "new", trial_start: null, trial_end: null, follow_up_date: null, notes: input.notes || null, created_at: new Date().toISOString(),
       estimated_value_cents: input.estimated_value_cents ?? null,
     });
     return;
@@ -933,13 +1064,27 @@ export async function createLead(input: { first_name: string; last_name: string;
   await exec(() => supabase().from("leads").insert({ ...input, gym_id: gymId, client_key: key }));
 }
 
-export async function setLeadStatus(leadId: string, status: LeadStatus): Promise<void> {
+export async function setLeadStatus(
+  leadId: string,
+  status: LeadStatus,
+  trial?: { start: string; end: string },
+): Promise<void> {
   if (isDemoMode) {
     const l = state.leads.find((x) => x.id === leadId);
-    if (l) l.status = status;
+    if (l) {
+      l.status = status;
+      if (trial) {
+        l.trial_start = trial.start;
+        l.trial_end = trial.end;
+        l.follow_up_date = trial.end;
+      }
+    }
     return;
   }
-  await exec(() => supabase().from("leads").update({ status }).eq("id", leadId));
+  await exec(() => supabase().from("leads").update({
+    status,
+    ...(trial ? { trial_start: trial.start, trial_end: trial.end, follow_up_date: trial.end } : {}),
+  }).eq("id", leadId));
 }
 
 // ============ TIMELINE / NOTES / TASKS / ATTACHMENTS (Twenty transfer, 0010) ============

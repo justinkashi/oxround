@@ -14,6 +14,7 @@ const nav: { href: string; label: keyof Messages["nav"]; roles?: string[] }[] = 
   { href: "/", label: "dashboard" },
   { href: "/members", label: "members" },
   { href: "/classes", label: "classes" },
+  { href: "/schedule", label: "schedule" },
   { href: "/scanner", label: "scanner" },
   { href: "/attendance", label: "attendance", roles: ["owner", "manager"] },
   { href: "/payments", label: "payments", roles: ["owner", "manager", "receptionist"] },

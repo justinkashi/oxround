@@ -128,12 +128,12 @@ function genPayments(): Payment[] {
 export const demoPayments: Payment[] = genPayments();
 
 export const demoLeads: Lead[] = [
-  { id: "l1", first_name: "Jess", last_name: "Morin", email: "jess@example.com", phone: "514-555-0201", source: "instagram", status: "new", follow_up_date: daysAgo(-1).slice(0, 10), notes: "DM'd about women's classes", created_at: daysAgo(1) },
-  { id: "l2", first_name: "Omar", last_name: "Diallo", email: null, phone: "514-555-0202", source: "walk_in", status: "contacted", follow_up_date: daysAgo(-2).slice(0, 10), notes: "Came by Saturday, wants evening classes", created_at: daysAgo(4) },
-  { id: "l3", first_name: "Priya", last_name: "Sharma", email: "priya@example.com", phone: null, source: "referral", status: "trial_scheduled", follow_up_date: daysAgo(-3).slice(0, 10), notes: "Friend of Leila — trial booked for Fundamentals", created_at: daysAgo(6) },
-  { id: "l4", first_name: "Max", last_name: "Roy", email: "max@example.com", phone: "514-555-0204", source: "tiktok", status: "trialing", follow_up_date: null, notes: "2 of 3 trial classes used", created_at: daysAgo(12) },
-  { id: "l5", first_name: "Chloé", last_name: "Dubé", email: "chloe@example.com", phone: null, source: "fight_event", status: "converted", follow_up_date: null, notes: "Signed up after Golden Gloves night", created_at: daysAgo(30) },
-  { id: "l6", first_name: "Sam", last_name: "Kim", email: null, phone: "514-555-0206", source: "website", status: "lost", follow_up_date: null, notes: "Moved to Laval", created_at: daysAgo(40) },
+  { id: "l1", first_name: "Jess", last_name: "Morin", email: "jess@example.com", phone: "514-555-0201", source: "instagram", status: "new", trial_start: null, trial_end: null, follow_up_date: daysAgo(-1).slice(0, 10), notes: "DM'd about women's classes", created_at: daysAgo(1) },
+  { id: "l2", first_name: "Omar", last_name: "Diallo", email: null, phone: "514-555-0202", source: "walk_in", status: "contacted", trial_start: null, trial_end: null, follow_up_date: daysAgo(-2).slice(0, 10), notes: "Came by Saturday, wants evening classes", created_at: daysAgo(4) },
+  { id: "l3", first_name: "Priya", last_name: "Sharma", email: "priya@example.com", phone: null, source: "referral", status: "trial_scheduled", trial_start: null, trial_end: null, follow_up_date: daysAgo(-3).slice(0, 10), notes: "Friend of Leila — trial booked for Fundamentals", created_at: daysAgo(6) },
+  { id: "l4", first_name: "Max", last_name: "Roy", email: "max@example.com", phone: "514-555-0204", source: "tiktok", status: "trialing", trial_start: daysAgo(4).slice(0, 10), trial_end: daysAgo(-2).slice(0, 10), follow_up_date: daysAgo(-2).slice(0, 10), notes: "2 of 3 trial classes used", created_at: daysAgo(12) },
+  { id: "l5", first_name: "Chloé", last_name: "Dubé", email: "chloe@example.com", phone: null, source: "fight_event", status: "converted", trial_start: null, trial_end: null, follow_up_date: null, notes: "Signed up after Golden Gloves night", created_at: daysAgo(30) },
+  { id: "l6", first_name: "Sam", last_name: "Kim", email: null, phone: "514-555-0206", source: "website", status: "lost", trial_start: null, trial_end: null, follow_up_date: null, notes: "Moved to Laval", created_at: daysAgo(40) },
 ];
 
 export const demoSettings: GymSettings = {

@@ -41,7 +41,7 @@ function SessionInner() {
 
   return (
     <div>
-      <Link href="/classes" className="text-sm text-brand hover:underline">{t.session.back}</Link>
+      <Link href="/schedule" className="text-sm text-brand hover:underline">{t.session.back}</Link>
       <div className="mb-6 mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{session.class_name}{session.status === "canceled" && <span className="ml-3 rounded bg-neutral-200 px-2 py-1 text-sm font-medium text-neutral-600">{t.session.canceled}</span>}</h1>

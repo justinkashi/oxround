@@ -200,6 +200,8 @@ export interface Lead {
   phone: string | null;
   source: LeadSource | null;
   status: LeadStatus;
+  trial_start: string | null;
+  trial_end: string | null;
   follow_up_date: string | null;
   notes: string | null;
   created_at: string;

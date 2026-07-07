@@ -28,6 +28,7 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [converting, setConverting] = useState<Lead | null>(null);
+  const [startingTrial, setStartingTrial] = useState<Lead | null>(null);
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", source: "walk_in" as LeadSource, notes: "", value: "" });
 
   const load = async () => setLeads(await listLeads());
@@ -51,6 +52,7 @@ export default function LeadsPage() {
     if (i < 0 || i >= order.length) return;
     // Guardrail (Twenty transfer): entering Converted goes through the convert flow.
     if (order[i] === "converted") { setConverting(lead); return; }
+    if (order[i] === "trialing" && (!lead.trial_start || !lead.trial_end)) { setStartingTrial(lead); return; }
     await setLeadStatus(lead.id, order[i]);
     load();
   };
@@ -111,6 +113,9 @@ export default function LeadsPage() {
                     </div>
                     {l.source && <div className="mt-0.5 text-neutral-400">{t.leads.via(t.labels.leadSource[l.source])}</div>}
                     {l.notes && <div className="mt-1 text-neutral-600">{l.notes}</div>}
+                    {l.status === "trialing" && l.trial_start && l.trial_end && (
+                      <TrialBadge lead={l} />
+                    )}
                     {l.follow_up_date && (
                       <div className={`mt-1 font-medium ${l.follow_up_date <= todayISO ? "text-red-600" : "text-neutral-500"}`}>
                         {t.leads.followUp(l.follow_up_date, l.follow_up_date <= todayISO)}
@@ -139,6 +144,79 @@ export default function LeadsPage() {
           onDone={() => { setConverting(null); load(); }}
         />
       )}
+      {startingTrial && (
+        <StartTrialModal
+          lead={startingTrial}
+          onClose={() => setStartingTrial(null)}
+          onDone={() => { setStartingTrial(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function daysBetween(start: string, end: string): number {
+  const startTime = new Date(`${start}T00:00:00`).getTime();
+  const endTime = new Date(`${end}T00:00:00`).getTime();
+  return Math.floor((endTime - startTime) / 86400000);
+}
+
+function trialDates(length: number): { start: string; end: string } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + Math.max(1, length) - 1);
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+function trialStatus(lead: Lead) {
+  if (!lead.trial_start || !lead.trial_end) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(`${lead.trial_end}T00:00:00`);
+  const total = daysBetween(lead.trial_start, lead.trial_end) + 1;
+  const day = Math.max(1, Math.min(total, daysBetween(lead.trial_start, today.toISOString().slice(0, 10)) + 1));
+  const remaining = daysBetween(today.toISOString().slice(0, 10), lead.trial_end);
+  return { day, total, remaining, expired: today > end };
+}
+
+function TrialBadge({ lead }: { lead: Lead }) {
+  const t = useT();
+  const status = trialStatus(lead);
+  if (!status) return null;
+  const color = status.expired ? "bg-red-50 text-red-700" : status.remaining <= 2 ? "bg-yellow-50 text-yellow-800" : "bg-green-50 text-green-700";
+  return (
+    <div className={`mt-2 rounded px-2 py-1 font-medium ${color}`}>
+      {status.expired ? t.leads.trialExpired : t.leads.trialDay(status.day, status.total)}
+    </div>
+  );
+}
+
+function StartTrialModal({ lead, onClose, onDone }: { lead: Lead; onClose: () => void; onDone: () => void }) {
+  const t = useT();
+  const [length, setLength] = useState(7);
+  const { submitting, run } = useSubmit(async () => {
+    await setLeadStatus(lead.id, "trialing", trialDates(length));
+    notify("success", t.leads.trialStarted(lead.first_name, length));
+    onDone();
+  });
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <h2 className="text-lg font-semibold">{t.leads.startTrialTitle(lead.first_name)}</h2>
+        <label className="mt-4 block text-sm font-medium">
+          {t.leads.trialLength}
+          <select value={length} onChange={(event) => setLength(Number(event.target.value))} className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm">
+            {[3, 7, 14, 30].map((days) => <option key={days} value={days}>{t.leads.trialDays(days)}</option>)}
+          </select>
+        </label>
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} disabled={submitting} className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">{t.common.cancel}</button>
+          <button onClick={() => run()} disabled={submitting} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-40">
+            {submitting ? t.common.saving : t.leads.startTrial}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
