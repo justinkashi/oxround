@@ -90,15 +90,43 @@ Deno.serve(async (req) => {
 
     const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (error) {
-      // If the person already has an account, link it instead of failing.
+      // inviteUserByEmail only emails BRAND-NEW addresses; an existing auth user → 422
+      // "already been registered" and no email. Two sub-cases (2026-07-06 fix):
+      //   1. Activated (signed in / confirmed at least once) → nothing to send; link + say so.
+      //   2. Invited but never activated → the ONLY way GoTrue re-sends an invite email is a
+      //      fresh inviteUserByEmail, so delete the stale pending auth user and re-invite.
+      //      Safe: a never-activated user owns no data (profiles cascade-deletes; gym_members
+      //      refs are nulled first because that FK is NO ACTION, then relinked to the new user).
       const already = /already|registered|exists|taken/i.test(error.message);
       if (already) {
         const { data: list } = await admin.auth.admin.listUsers();
         const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
-        if (existing && !member.user_id) {
-          await admin.from("gym_members").update({ user_id: existing.id }).eq("id", member.id);
+        if (!existing) {
+          console.error("invite-member: 'already registered' but user not found:", error.message);
+          return json({ error: `email provider error: ${error.message}` }, 502);
         }
-        return json({ ok: true, note: "already had an account — linked (no new email)" });
+        const activated = !!existing.last_sign_in_at || !!existing.email_confirmed_at;
+        if (activated) {
+          if (!member.user_id) {
+            await admin.from("gym_members").update({ user_id: existing.id }).eq("id", member.id);
+          }
+          return json({ ok: true, note: "no email sent — they already have an active account and can just log in" });
+        }
+        await admin.from("gym_members").update({ user_id: null }).eq("user_id", existing.id);
+        const { error: delErr } = await admin.auth.admin.deleteUser(existing.id);
+        if (delErr) {
+          console.error("invite-member: couldn't remove stale pending user:", delErr.message);
+          return json({ error: `couldn't refresh the pending invite: ${delErr.message}` }, 500);
+        }
+        const { data: reinvited, error: reErr } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
+        if (reErr) {
+          console.error("invite-member: re-invite failed:", reErr.message);
+          return json({ error: `email provider error: ${reErr.message}` }, 502);
+        }
+        if (reinvited?.user?.id) {
+          await admin.from("gym_members").update({ user_id: reinvited.user.id }).eq("id", member.id);
+        }
+        return json({ ok: true, note: "fresh invite emailed (their old link is now void)" });
       }
       console.error("invite-member: inviteUserByEmail failed:", error.message);
       return json({ error: `email provider error: ${error.message}` }, 502);

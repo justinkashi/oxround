@@ -74,7 +74,9 @@ export default function MembersPage() {
       if (form.email) {
         const r = await inviteMemberEmail(form.email);
         setNotice(r.ok
-          ? `${form.first_name} added ✓ — app invite sent to ${form.email}.`
+          ? (r.note
+            ? `${form.first_name} added ✓ — ${r.note}.`
+            : `${form.first_name} added ✓ — app invite sent to ${form.email}.`)
           : `${form.first_name} added ✓. Invite not sent yet (${r.error}) — use “Resend invite” on their row anytime; it doesn't affect their membership.`);
       } else {
         setNotice(`${form.first_name} added ✓. No email on file, so no app invite yet — add one via Edit to invite them.`);
@@ -129,7 +131,9 @@ export default function MembersPage() {
     if (!m.email) { setNotice(`${m.first_name} has no email — add one via Edit first.`); return; }
     setNotice(`Sending invite to ${m.email}…`);
     const r = await inviteMemberEmail(m.email);
-    setNotice(r.ok ? `Invite sent to ${m.email} ✓.` : `Couldn't send invite to ${m.email}: ${r.error}`);
+    setNotice(r.ok
+      ? (r.note ? `${m.first_name}: ${r.note} ✓.` : `Invite sent to ${m.email} ✓.`)
+      : `Couldn't send invite to ${m.email}: ${r.error}`);
   };
 
   return (

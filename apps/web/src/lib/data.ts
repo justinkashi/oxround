@@ -579,7 +579,7 @@ async function currentMemberId(): Promise<string | null> {
 }
 
 // Invite a member to the app (Step 6G): triggers the invite-member Edge Function (sends email + links account).
-export async function inviteMemberEmail(email: string): Promise<{ ok: boolean; error?: string }> {
+export async function inviteMemberEmail(email: string): Promise<{ ok: boolean; error?: string; note?: string }> {
   if (isDemoMode) return { ok: true };
   const { data, error } = await supabase().functions.invoke("invite-member", { body: { email } });
   if (error) {
@@ -595,7 +595,9 @@ export async function inviteMemberEmail(email: string): Promise<{ ok: boolean; e
     return { ok: false, error: detail };
   }
   if (data?.error) return { ok: false, error: data.error };
-  return { ok: true };
+  // `note` = success but NOT the standard "invite sent" (e.g. already active — no email sent).
+  // Surfacing it stops the UI claiming "sent" when nothing was emailed (2026-07-06 fix).
+  return { ok: true, note: (data?.note as string) || undefined };
 }
 
 export async function listAnnouncements(): Promise<Announcement[]> {
