@@ -97,6 +97,9 @@ export const en = {
     addedInviteFailed: (first: string, error: string) =>
       `${first} added ✓. Invite not sent yet (${error}) — use “Resend invite” on their row anytime; it doesn't affect their membership.`,
     addedNoEmail: (first: string) => `${first} added ✓. No email on file, so no app invite yet — add one via Edit to invite them.`,
+    addedNoInvite: (first: string) => `${first} added ✓. No app invite sent — use “Resend invite” on their row when you're ready.`,
+    inviteToggleLabel: "Send them an app invite email now",
+    inviteToggleHint: "Add an email above to send an app invite",
     updated: (first: string) => `${first} updated ✓.`,
     archivedMsg: (first: string) => `${first} archived.`,
     restoredMsg: (first: string) => `${first} restored to your active list.`,
@@ -525,6 +528,7 @@ export const en = {
     createdInviteSent: (name: string, email: string) => `${name} added as coach ✓ — invite sent to ${email}.`,
     createdInviteFailed: (name: string, error: string) => `${name} added as coach ✓. Invite not sent yet (${error}).`,
     createdNoEmail: (name: string) => `${name} added as coach ✓. Add an email later to invite them.`,
+    createdNoInvite: (name: string) => `${name} added as coach ✓. No app invite sent.`,
     inviteSent: (email: string) => `Coach invite sent to ${email} ✓.`,
     inviteFailed: (error: string) => `Coach role updated, but invite failed: ${error}`,
     removeRole: "remove coach role",

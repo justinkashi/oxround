@@ -97,6 +97,9 @@ export const fr: Messages = {
     addedInviteFailed: (first: string, error: string) =>
       `${first} ajouté(e) ✓. Invitation non envoyée (${error}) — utilisez « Renvoyer l'invitation » sur sa ligne en tout temps; cela n'affecte pas son abonnement.`,
     addedNoEmail: (first: string) => `${first} ajouté(e) ✓. Aucun courriel au dossier, donc pas d'invitation — ajoutez-en un via Modifier pour l'inviter.`,
+    addedNoInvite: (first: string) => `${first} ajouté(e) ✓. Aucune invitation envoyée — utilisez « Renvoyer l'invitation » sur sa ligne quand vous serez prêt.`,
+    inviteToggleLabel: "Envoyer une invitation à l'appli maintenant",
+    inviteToggleHint: "Ajoutez un courriel ci-dessus pour envoyer une invitation",
     updated: (first: string) => `${first} mis(e) à jour ✓.`,
     archivedMsg: (first: string) => `${first} archivé(e).`,
     restoredMsg: (first: string) => `${first} restauré(e) dans votre liste active.`,
@@ -524,6 +527,7 @@ export const fr: Messages = {
     createdInviteSent: (name: string, email: string) => `${name} ajouté(e) comme entraîneur ✓ — invitation envoyée à ${email}.`,
     createdInviteFailed: (name: string, error: string) => `${name} ajouté(e) comme entraîneur ✓. Invitation non envoyée (${error}).`,
     createdNoEmail: (name: string) => `${name} ajouté(e) comme entraîneur ✓. Ajoutez un courriel plus tard pour l'inviter.`,
+    createdNoInvite: (name: string) => `${name} ajouté(e) comme entraîneur ✓. Aucune invitation envoyée.`,
     inviteSent: (email: string) => `Invitation entraîneur envoyée à ${email} ✓.`,
     inviteFailed: (error: string) => `Rôle entraîneur mis à jour, mais l'invitation a échoué : ${error}`,
     removeRole: "retirer le rôle d'entraîneur",

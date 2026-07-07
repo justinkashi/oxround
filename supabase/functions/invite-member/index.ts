@@ -27,6 +27,18 @@ function claimsFromToken(token: string): { roles: string[]; gymId: string | null
   }
 }
 
+// Link a gym_members row to an auth user. Returns an error message, or null on success.
+// Every user_id write goes through here (or is error-checked inline) so a failed link
+// surfaces as a real error instead of a silent "invite sent" that dead-ends at /no-access.
+async function linkMember(
+  admin: ReturnType<typeof createClient>,
+  memberId: string,
+  userId: string | null,
+): Promise<string | null> {
+  const { error } = await admin.from("gym_members").update({ user_id: userId }).eq("id", memberId);
+  return error?.message ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -108,11 +120,21 @@ Deno.serve(async (req) => {
         const activated = !!existing.last_sign_in_at || !!existing.email_confirmed_at;
         if (activated) {
           if (!member.user_id) {
-            await admin.from("gym_members").update({ user_id: existing.id }).eq("id", member.id);
+            const linkErr = await linkMember(admin, member.id, existing.id);
+            if (linkErr) {
+              console.error("invite-member: link of active user failed:", linkErr);
+              return json({ error: `couldn't link their existing account: ${linkErr}` }, 500);
+            }
           }
           return json({ ok: true, note: "no email sent — they already have an active account and can just log in" });
         }
-        await admin.from("gym_members").update({ user_id: null }).eq("user_id", existing.id);
+        // Null the stale pending user's link before deleting it (FK is NO ACTION, so an
+        // unchecked failure here would make the deleteUser below fail confusingly).
+        const { error: unlinkErr } = await admin.from("gym_members").update({ user_id: null }).eq("user_id", existing.id);
+        if (unlinkErr) {
+          console.error("invite-member: couldn't unlink stale pending user:", unlinkErr.message);
+          return json({ error: `couldn't refresh the pending invite: ${unlinkErr.message}` }, 500);
+        }
         const { error: delErr } = await admin.auth.admin.deleteUser(existing.id);
         if (delErr) {
           console.error("invite-member: couldn't remove stale pending user:", delErr.message);
@@ -124,7 +146,11 @@ Deno.serve(async (req) => {
           return json({ error: `email provider error: ${reErr.message}` }, 502);
         }
         if (reinvited?.user?.id) {
-          await admin.from("gym_members").update({ user_id: reinvited.user.id }).eq("id", member.id);
+          const linkErr = await linkMember(admin, member.id, reinvited.user.id);
+          if (linkErr) {
+            console.error("invite-member: link after re-invite failed:", linkErr);
+            return json({ error: `invite emailed but linking the account failed — retry: ${linkErr}` }, 500);
+          }
         }
         return json({ ok: true, note: "fresh invite emailed (their old link is now void)" });
       }
@@ -133,7 +159,11 @@ Deno.serve(async (req) => {
     }
 
     if (invited?.user?.id && !member.user_id) {
-      await admin.from("gym_members").update({ user_id: invited.user.id }).eq("id", member.id);
+      const linkErr = await linkMember(admin, member.id, invited.user.id);
+      if (linkErr) {
+        console.error("invite-member: link after invite failed:", linkErr);
+        return json({ error: `invite emailed but linking the account failed — retry: ${linkErr}` }, 500);
+      }
     }
     return json({ ok: true });
   } catch (e) {

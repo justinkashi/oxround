@@ -35,7 +35,7 @@ export default function MembersPage() {
   const [editing, setEditing] = useState<GymMember | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "member" as "member" | "coach" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", role: "member" as "member" | "coach", invite: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -75,8 +75,10 @@ export default function MembersPage() {
     setBusy(true);
     try {
       await createMember(form);
-      // D-24: email the new person an activation link (member → app, coach → CRM). No-op in demo.
-      if (form.email) {
+      // D-24: emailing an activation link is now opt-in via the "invite" checkbox.
+      if (!form.email) {
+        setNotice(t.members.addedNoEmail(form.first_name));
+      } else if (form.invite) {
         const r = await inviteMemberEmail(form.email);
         setNotice(r.ok
           ? (r.note
@@ -84,9 +86,9 @@ export default function MembersPage() {
             : t.members.addedInviteSent(form.first_name, form.email))
           : t.members.addedInviteFailed(form.first_name, r.error ?? ""));
       } else {
-        setNotice(t.members.addedNoEmail(form.first_name));
+        setNotice(t.members.addedNoInvite(form.first_name));
       }
-      setForm({ first_name: "", last_name: "", email: "", phone: "", role: "member" });
+      setForm({ first_name: "", last_name: "", email: "", phone: "", role: "member", invite: false });
       setShowForm(false);
       load();
     } catch (err) {
@@ -199,6 +201,10 @@ export default function MembersPage() {
             <option value="member">{t.members.roleMember}</option>
             <option value="coach">{t.members.roleCoach}</option>
           </select>
+          <label className="flex items-center gap-2 text-sm text-neutral-600 sm:col-span-2 md:col-span-6">
+            <input type="checkbox" checked={form.invite && !!form.email.trim()} disabled={!form.email.trim()} onChange={(e) => setForm({ ...form, invite: e.target.checked })} />
+            {form.email.trim() ? t.members.inviteToggleLabel : t.members.inviteToggleHint}
+          </label>
           <button type="submit" disabled={busy} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy ? t.members.creating : t.members.create}</button>
           <p className="text-xs text-neutral-400 sm:col-span-2 md:col-span-6">{t.members.formHint}</p>
         </form>

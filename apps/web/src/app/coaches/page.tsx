@@ -1,23 +1,21 @@
 "use client";
-// Coach management: staff list, promote member to coach, demote. (FEATURES: Coach Management)
+// Coach management: staff list, create coach, demote. (FEATURES: Coach Management)
 
 import { useEffect, useState } from "react";
 import {
-  createMember, inviteMemberEmail, listCoaches, listMembers, setMemberRoles, updateMember,
+  createMember, inviteMemberEmail, listCoaches, setMemberRoles, updateMember,
   type MemberProfileUpdate,
 } from "@/lib/data";
 import type { GymMember } from "@/lib/types";
 import DestructiveActionModal from "@/components/DestructiveActionModal";
 import { useT } from "@/lib/i18n";
 
-type CoachForm = { first_name: string; last_name: string; email: string; phone: string };
-const blankCoachForm = (): CoachForm => ({ first_name: "", last_name: "", email: "", phone: "" });
+type CoachForm = { first_name: string; last_name: string; email: string; phone: string; invite: boolean };
+const blankCoachForm = (): CoachForm => ({ first_name: "", last_name: "", email: "", phone: "", invite: false });
 
 export default function CoachesPage() {
   const t = useT();
   const [coaches, setCoaches] = useState<GymMember[]>([]);
-  const [members, setMembers] = useState<GymMember[]>([]);
-  const [promoteId, setPromoteId] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [newForm, setNewForm] = useState(blankCoachForm);
   const [newBusy, setNewBusy] = useState(false);
@@ -28,23 +26,9 @@ export default function CoachesPage() {
   const [editError, setEditError] = useState<string | null>(null);
 
   const load = async () => {
-    const [c, m] = await Promise.all([listCoaches(), listMembers()]);
-    setCoaches(c);
-    setMembers(m);
+    setCoaches(await listCoaches());
   };
   useEffect(() => { load(); }, []);
-
-  const promote = async () => {
-    const m = members.find((x) => x.id === promoteId);
-    if (!m) return;
-    await setMemberRoles(m.id, Array.from(new Set([...m.roles, "coach" as const])));
-    if (m.email) {
-      const result = await inviteMemberEmail(m.email);
-      setNotice(result.ok ? t.coaches.inviteSent(m.email) : t.coaches.inviteFailed(result.error ?? ""));
-    }
-    setPromoteId("");
-    load();
-  };
 
   const createCoach = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -53,11 +37,13 @@ export default function CoachesPage() {
     setNotice(null);
     try {
       const coach = await createMember({ ...newForm, role: "coach" });
-      if (newForm.email) {
+      if (!newForm.email) {
+        setNotice(t.coaches.createdNoEmail(coach.first_name));
+      } else if (newForm.invite) {
         const result = await inviteMemberEmail(newForm.email);
         setNotice(result.ok ? t.coaches.createdInviteSent(coach.first_name, newForm.email) : t.coaches.createdInviteFailed(coach.first_name, result.error ?? ""));
       } else {
-        setNotice(t.coaches.createdNoEmail(coach.first_name));
+        setNotice(t.coaches.createdNoInvite(coach.first_name));
       }
       setNewForm(blankCoachForm());
       setShowNew(false);
@@ -92,18 +78,11 @@ export default function CoachesPage() {
     load();
   };
 
-  const promotable = members.filter((m) => !m.roles.includes("coach") && !m.roles.includes("owner"));
-
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{t.coaches.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={promoteId} onChange={(e) => setPromoteId(e.target.value)} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
-            <option value="">{t.coaches.promoteMember}</option>
-            {promotable.map((m) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-          </select>
-          <button disabled={!promoteId} onClick={promote} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{t.coaches.makeCoach}</button>
           <button onClick={() => setShowNew(!showNew)} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white">{t.coaches.newCoach}</button>
         </div>
       </div>
@@ -116,6 +95,10 @@ export default function CoachesPage() {
           <input placeholder={t.members.lastName} value={newForm.last_name} onChange={(event) => setNewForm({ ...newForm, last_name: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
           <input type="email" placeholder={t.members.emailOptional} value={newForm.email} onChange={(event) => setNewForm({ ...newForm, email: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
           <input placeholder={t.members.phoneOptional} value={newForm.phone} onChange={(event) => setNewForm({ ...newForm, phone: event.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+          <label className="flex items-center gap-2 text-sm text-neutral-600 sm:col-span-2 md:col-span-5">
+            <input type="checkbox" checked={newForm.invite && !!newForm.email.trim()} disabled={!newForm.email.trim()} onChange={(event) => setNewForm({ ...newForm, invite: event.target.checked })} />
+            {newForm.email.trim() ? t.members.inviteToggleLabel : t.members.inviteToggleHint}
+          </label>
           <button type="submit" disabled={newBusy || !newForm.first_name.trim()} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{newBusy ? t.common.saving : t.coaches.createCoach}</button>
           {newError && <p className="rounded-md bg-red-50 p-2 text-sm text-red-700 sm:col-span-2 md:col-span-5">{newError}</p>}
         </form>

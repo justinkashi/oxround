@@ -1,1 +1,26 @@
-{}
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/announcements/page": "app/announcements/page.js",
+  "/app/page": "app/app/page.js",
+  "/attendance/page": "app/attendance/page.js",
+  "/auth/callback/page": "app/auth/callback/page.js",
+  "/auth/confirm/route": "app/auth/confirm/route.js",
+  "/classes/page": "app/classes/page.js",
+  "/classes/session/page": "app/classes/session/page.js",
+  "/coaches/page": "app/coaches/page.js",
+  "/leads/page": "app/leads/page.js",
+  "/login/page": "app/login/page.js",
+  "/members/[id]/page": "app/members/[id]/page.js",
+  "/members/page": "app/members/page.js",
+  "/members/view/page": "app/members/view/page.js",
+  "/messages/page": "app/messages/page.js",
+  "/no-access/page": "app/no-access/page.js",
+  "/page": "app/page.js",
+  "/payments/page": "app/payments/page.js",
+  "/plans/page": "app/plans/page.js",
+  "/reports/page": "app/reports/page.js",
+  "/scanner/page": "app/scanner/page.js",
+  "/schedule/page": "app/schedule/page.js",
+  "/settings/page": "app/settings/page.js"
+}
