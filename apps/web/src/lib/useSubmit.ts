@@ -6,6 +6,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { notify } from "@/components/toast";
+import { getMessages } from "@/lib/i18n";
 
 export function useSubmit<A extends unknown[]>(
   action: (...args: A) => Promise<void>,
@@ -23,7 +24,7 @@ export function useSubmit<A extends unknown[]>(
         await action(...args);
         if (opts?.successMessage) notify("success", opts.successMessage);
       } catch (e) {
-        notify("error", e instanceof Error ? e.message : "Something went wrong.");
+        notify("error", e instanceof Error ? e.message : getMessages().common.somethingWentWrong);
         if (opts?.rethrow) throw e;
       } finally {
         inFlight.current = false;

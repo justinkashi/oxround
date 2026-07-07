@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useSubmit } from "@/lib/useSubmit";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   open: boolean;
@@ -19,6 +20,7 @@ type Props = {
 export default function DestructiveActionModal({
   open, title, description, actionLabel, confirmText, onConfirm, onClose,
 }: Props) {
+  const t = useT();
   const [typed, setTyped] = useState("");
   const { submitting, run } = useSubmit(async () => {
     await onConfirm();
@@ -49,7 +51,7 @@ export default function DestructiveActionModal({
         {confirmText && (
           <div className="mt-4">
             <label className="text-xs text-neutral-500">
-              Type <span className="font-mono font-semibold text-neutral-800">{confirmText}</span> to confirm
+              {t.modal.typeToConfirmBefore} <span className="font-mono font-semibold text-neutral-800">{confirmText}</span> {t.modal.typeToConfirmAfter}
             </label>
             <input
               autoFocus
@@ -67,14 +69,14 @@ export default function DestructiveActionModal({
             disabled={submitting}
             className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             onClick={() => run()}
             disabled={locked || submitting}
             className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Working…" : actionLabel}
+            {submitting ? t.common.working : actionLabel}
           </button>
         </div>
       </div>

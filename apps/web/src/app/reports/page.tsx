@@ -4,10 +4,11 @@
 import { useEffect, useState } from "react";
 import { attendanceSummaries, listMembers, listPayments, listSessions, bookingCounts } from "@/lib/data";
 import type { MemberAttendanceSummary, GymMember, Payment } from "@/lib/types";
-
-const money = (cents: number) => `$${(cents / 100).toFixed(0)}`;
+import { useFormat, useT } from "@/lib/i18n";
 
 export default function ReportsPage() {
+  const t = useT();
+  const fmt = useFormat();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [members, setMembers] = useState<GymMember[]>([]);
   const [summaries, setSummaries] = useState<MemberAttendanceSummary[]>([]);
@@ -56,61 +57,61 @@ export default function ReportsPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Reports</h1>
-        <button onClick={exportCsv} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50">Export payments CSV</button>
+        <h1 className="text-2xl font-bold">{t.reports.title}</h1>
+        <button onClick={exportCsv} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50">{t.reports.exportCsv}</button>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Active members" value={String(activeMembers)} />
-        <Stat label="Revenue this month" value={money(months.at(-1)?.[1] ?? 0)} />
-        <Stat label="At-risk members" value={String(atRisk)} warn={atRisk > 0} />
-        <Stat label="Total collected (all time)" value={money(payments.reduce((s, p) => s + p.amount_cents, 0))} />
+        <Stat label={t.reports.activeMembers} value={String(activeMembers)} />
+        <Stat label={t.reports.revenueThisMonth} value={fmt.money((months.at(-1)?.[1] ?? 0) / 100)} />
+        <Stat label={t.reports.atRiskMembers} value={String(atRisk)} warn={atRisk > 0} />
+        <Stat label={t.reports.totalCollected} value={fmt.money(payments.reduce((s, p) => s + p.amount_cents, 0) / 100)} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Revenue by month</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">{t.reports.revenueByMonth}</h2>
           <div className="space-y-2">
             {months.map(([m, v]) => (
               <div key={m} className="flex items-center gap-2 text-sm">
                 <span className="w-16 text-neutral-500">{m}</span>
                 <div className="h-5 rounded bg-brand/80" style={{ width: `${(v / maxMonth) * 70}%` }} />
-                <span className="font-medium">{money(v)}</span>
+                <span className="font-medium">{fmt.money(v / 100)}</span>
               </div>
             ))}
-            {months.length === 0 && <div className="text-neutral-400">No payments yet</div>}
+            {months.length === 0 && <div className="text-neutral-400">{t.reports.noPayments}</div>}
           </div>
         </div>
 
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Popular classes (this week&apos;s bookings)</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">{t.reports.popularClasses}</h2>
           <div className="space-y-2">
             {classPopularity.map((c) => (
               <div key={c.name} className="flex items-center justify-between border-b border-neutral-100 pb-1 text-sm">
-                <span>{c.name}</span><span className="font-medium">{c.booked} booked</span>
+                <span>{c.name}</span><span className="font-medium">{t.reports.booked(c.booked)}</span>
               </div>
             ))}
-            {classPopularity.length === 0 && <div className="text-neutral-400">No bookings this week</div>}
+            {classPopularity.length === 0 && <div className="text-neutral-400">{t.reports.noBookings}</div>}
           </div>
-          <h2 className="mb-3 mt-6 text-sm font-semibold uppercase text-neutral-500">Revenue by method</h2>
+          <h2 className="mb-3 mt-6 text-sm font-semibold uppercase text-neutral-500">{t.reports.revenueByMethod}</h2>
           {Object.entries(byMethod).map(([m, v]) => (
             <div key={m} className="flex items-center justify-between border-b border-neutral-100 pb-1 text-sm">
-              <span className="capitalize">{m}</span><span className="font-medium">{money(v)}</span>
+              <span>{t.labels.paymentMethod[m] ?? m}</span><span className="font-medium">{fmt.money(v / 100)}</span>
             </div>
           ))}
         </div>
       </div>
 
       <div className="mt-4 rounded-lg border border-neutral-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Attendance leaderboard (30 days)</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">{t.reports.attendanceLeaderboard}</h2>
         <table className="w-full text-sm">
           <tbody>
             {summaries.slice(0, 8).map((s, i) => (
               <tr key={s.member.id} className="border-t border-neutral-100 first:border-t-0">
                 <td className="py-1.5 pr-2 text-neutral-400">{i + 1}</td>
                 <td className="py-1.5 font-medium">{s.member.first_name} {s.member.last_name}</td>
-                <td className="py-1.5">{s.visitsLast30} visits</td>
-                <td className="py-1.5 text-neutral-500">{s.streakWeeks}-week streak</td>
+                <td className="py-1.5">{t.reports.visits(s.visitsLast30)}</td>
+                <td className="py-1.5 text-neutral-500">{t.reports.weekStreak(s.streakWeeks)}</td>
               </tr>
             ))}
           </tbody>

@@ -8,8 +8,10 @@ import { useSearchParams } from "next/navigation";
 import { addBooking, cancelSession, getSession, listMembers, sessionBookings, setBookingStatus } from "@/lib/data";
 import type { ClassBooking, ClassSession, GymMember } from "@/lib/types";
 import DestructiveActionModal from "@/components/DestructiveActionModal";
+import { useT } from "@/lib/i18n";
 
 function SessionInner() {
+  const t = useT();
   const id = useSearchParams().get("id") ?? "";
   const [session, setSession] = useState<ClassSession | null>(null);
   const [bookings, setBookings] = useState<ClassBooking[]>([]);
@@ -25,7 +27,7 @@ function SessionInner() {
   };
   useEffect(() => { if (id) load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!session) return <div className="text-neutral-500">Loading session…</div>;
+  if (!session) return <div className="text-neutral-500">{t.session.loading}</div>;
 
   const active = bookings.filter((b) => b.status === "booked" || b.status === "attended" || b.status === "no_show");
   const waitlist = bookings.filter((b) => b.status === "waitlisted");
@@ -39,42 +41,42 @@ function SessionInner() {
 
   return (
     <div>
-      <Link href="/classes" className="text-sm text-brand hover:underline">← Back to classes</Link>
+      <Link href="/classes" className="text-sm text-brand hover:underline">{t.session.back}</Link>
       <div className="mb-6 mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{session.class_name}{session.status === "canceled" && <span className="ml-3 rounded bg-neutral-200 px-2 py-1 text-sm font-medium text-neutral-600">CANCELED</span>}</h1>
-          <p className="text-sm text-neutral-500">{session.session_date} · {session.start_time.slice(0, 5)} · {session.duration_mins} min · Coach: {session.coach_name}
-            {session.capacity != null && <> · {active.filter((b) => b.status !== "no_show").length}/{session.capacity} spots</>}</p>
+          <h1 className="text-2xl font-bold">{session.class_name}{session.status === "canceled" && <span className="ml-3 rounded bg-neutral-200 px-2 py-1 text-sm font-medium text-neutral-600">{t.session.canceled}</span>}</h1>
+          <p className="text-sm text-neutral-500">{t.session.meta(session.session_date, session.start_time.slice(0, 5), session.duration_mins, session.coach_name)}
+            {session.capacity != null && <>{t.session.spots(active.filter((b) => b.status !== "no_show").length, session.capacity)}</>}</p>
         </div>
         {session.status === "scheduled" && (
           <button onClick={() => setConfirmCancel(true)}
-            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Cancel session</button>
+            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{t.session.cancelSession}</button>
         )}
       </div>
 
       <DestructiveActionModal
         open={confirmCancel}
-        title="Cancel this session?"
-        description="Booked members should be notified. The session stays visible as CANCELED; bookings are kept for the record."
-        actionLabel="Cancel session"
+        title={t.session.cancelTitle}
+        description={t.session.cancelDescription}
+        actionLabel={t.session.cancelSession}
         onConfirm={async () => { await cancelSession(id); load(); }}
         onClose={() => setConfirmCancel(false)}
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select value={addId} onChange={(e) => setAddId(e.target.value)} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
-          <option value="">Add a member…</option>
+          <option value="">{t.session.addMember}</option>
           {addable.map((m) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
         </select>
         <button disabled={!addId} onClick={async () => { await addBooking(id, addId); setAddId(""); load(); }}
-          className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-40">Book</button>
-        <span className="text-xs text-neutral-400">Full sessions auto-waitlist.</span>
+          className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{t.session.book}</button>
+        <span className="text-xs text-neutral-400">{t.session.autoWaitlist}</span>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
-            <tr><th className="px-4 py-2">Member</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Booked</th><th className="px-4 py-2 text-right">Mark</th></tr>
+            <tr><th className="px-4 py-2">{t.session.member}</th><th className="px-4 py-2">{t.session.status}</th><th className="px-4 py-2">{t.session.booked}</th><th className="px-4 py-2 text-right">{t.session.mark}</th></tr>
           </thead>
           <tbody>
             {active.map((b) => (
@@ -84,21 +86,21 @@ function SessionInner() {
                 <td className="px-4 py-2 text-neutral-500">{b.booked_at.slice(0, 10)}</td>
                 <td className="px-4 py-2 text-right">
                   {b.status === "booked" && <>
-                    <button onClick={() => mark(b.id, "attended")} className="mr-3 text-xs text-green-700 hover:underline">attended</button>
-                    <button onClick={() => mark(b.id, "no_show")} className="mr-3 text-xs text-red-600 hover:underline">no-show</button>
-                    <button onClick={() => mark(b.id, "canceled")} className="text-xs text-neutral-500 hover:underline">cancel</button>
+                    <button onClick={() => mark(b.id, "attended")} className="mr-3 text-xs text-green-700 hover:underline">{t.session.attended}</button>
+                    <button onClick={() => mark(b.id, "no_show")} className="mr-3 text-xs text-red-600 hover:underline">{t.session.noShow}</button>
+                    <button onClick={() => mark(b.id, "canceled")} className="text-xs text-neutral-500 hover:underline">{t.session.cancel}</button>
                   </>}
                 </td>
               </tr>
             ))}
-            {active.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-neutral-400">No bookings yet</td></tr>}
+            {active.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-neutral-400">{t.session.noBookings}</td></tr>}
           </tbody>
         </table>
       </div>
 
       {waitlist.length > 0 && (
         <>
-          <h2 className="mb-2 mt-6 text-lg font-semibold">Waitlist ({waitlist.length})</h2>
+          <h2 className="mb-2 mt-6 text-lg font-semibold">{t.session.waitlist(waitlist.length)}</h2>
           <div className="overflow-hidden rounded-lg border border-yellow-200 bg-yellow-50">
             <table className="w-full text-sm">
               <tbody>
@@ -107,8 +109,8 @@ function SessionInner() {
                     <td className="px-4 py-2 text-xs text-neutral-500">#{i + 1}</td>
                     <td className="px-4 py-2 font-medium">{b.member_name}</td>
                     <td className="px-4 py-2 text-right">
-                      <button onClick={() => mark(b.id, "booked")} className="mr-3 text-xs text-green-700 hover:underline">promote</button>
-                      <button onClick={() => mark(b.id, "canceled")} className="text-xs text-neutral-500 hover:underline">remove</button>
+                      <button onClick={() => mark(b.id, "booked")} className="mr-3 text-xs text-green-700 hover:underline">{t.session.promote}</button>
+                      <button onClick={() => mark(b.id, "canceled")} className="text-xs text-neutral-500 hover:underline">{t.session.remove}</button>
                     </td>
                   </tr>
                 ))}
@@ -122,15 +124,21 @@ function SessionInner() {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const t = useT();
   const colors: Record<string, string> = {
     booked: "bg-blue-100 text-blue-700",
     attended: "bg-green-100 text-green-700",
     no_show: "bg-red-100 text-red-700",
     waitlisted: "bg-yellow-100 text-yellow-700",
   };
-  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${colors[status] ?? "bg-neutral-100 text-neutral-600"}`}>{status.replace("_", "-")}</span>;
+  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${colors[status] ?? "bg-neutral-100 text-neutral-600"}`}>{t.labels.bookingStatus[status] ?? status.replace("_", "-")}</span>;
 }
 
 export default function SessionPage() {
-  return <Suspense fallback={<div className="text-neutral-500">Loading…</div>}><SessionInner /></Suspense>;
+  return <Suspense fallback={<SessionLoading />}><SessionInner /></Suspense>;
+}
+
+function SessionLoading() {
+  const t = useT();
+  return <div className="text-neutral-500">{t.session.loadingShort}</div>;
 }

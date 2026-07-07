@@ -6,8 +6,10 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/data";
+import { getMessages, useT } from "@/lib/i18n";
 
 function CallbackInner() {
+  const t = useT();
   const params = useSearchParams();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -20,13 +22,13 @@ function CallbackInner() {
       return;
     }
     if (!code) {
-      setError("No sign-in code in the link. Request a new magic link.");
+      setError(getMessages().auth.noCode);
       return;
     }
     supabase()
       .auth.exchangeCodeForSession(code)
       .then(({ error }) => {
-        if (error) setError(`${error.message}. The link may have expired, or was opened in a different browser than the one that requested it.`);
+        if (error) setError(`${error.message}. ${getMessages().auth.expiredOrBrowser}`);
         else router.replace("/");
       });
   }, [params, router]);
@@ -37,14 +39,14 @@ function CallbackInner() {
         {!error ? (
           <>
             <div className="text-3xl">🥊</div>
-            <p className="mt-3 text-sm text-neutral-600">Signing you in…</p>
+            <p className="mt-3 text-sm text-neutral-600">{t.auth.signingIn}</p>
           </>
         ) : (
           <>
-            <p className="text-sm font-semibold text-red-700">Sign-in failed</p>
+            <p className="text-sm font-semibold text-red-700">{t.auth.failed}</p>
             <p className="mt-2 text-xs text-neutral-600">{error}</p>
             <Link href="/login" className="mt-4 inline-block rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white">
-              Back to login
+              {t.auth.backToLogin}
             </Link>
           </>
         )}
@@ -54,5 +56,10 @@ function CallbackInner() {
 }
 
 export default function AuthCallbackPage() {
-  return <Suspense fallback={<div className="p-8 text-neutral-500">Signing you in…</div>}><CallbackInner /></Suspense>;
+  return <Suspense fallback={<AuthLoading />}><CallbackInner /></Suspense>;
+}
+
+function AuthLoading() {
+  const t = useT();
+  return <div className="p-8 text-neutral-500">{t.auth.signingIn}</div>;
 }

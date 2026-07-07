@@ -2,6 +2,8 @@
 // friendly error mapping. Used by every mutation in lib/data.ts.
 "use client";
 
+import { getMessages } from "@/lib/i18n";
+
 // HTTP statuses worth retrying: rate limit + temporary gateway/server overload.
 const RETRY_STATUSES = new Set([429, 502, 503, 504]);
 const RETRY_DELAYS_MS = [1000, 2000, 4000]; // 3 attempts total after the first
@@ -56,15 +58,17 @@ export function isIdempotentReplay(error: unknown): boolean {
   return !!e && e.code === "23505" && /client_key/.test(e.message ?? "");
 }
 
-// Map raw Postgres/PostgREST errors to something a gym owner can act on.
+// Map raw Postgres/PostgREST errors to something a gym owner can act on,
+// in the user's chosen language.
 export function friendlyDbError(error: unknown): string {
+  const t = getMessages();
   const e = error as PgError | null;
-  if (!e) return "Something went wrong.";
-  const msg = e.message ?? "Something went wrong.";
-  if (e.code === "23505") return "That record already exists (duplicate).";
-  if (e.code === "23503") return "That record is linked to other data and the reference is invalid.";
-  if (e.code === "23514") return "One of the values isn't allowed — check the fields and try again.";
-  if (e.code === "42501") return "You don't have permission to do that.";
+  if (!e) return t.common.somethingWentWrong;
+  const msg = e.message ?? t.common.somethingWentWrong;
+  if (e.code === "23505") return t.errors.duplicate;
+  if (e.code === "23503") return t.errors.badReference;
+  if (e.code === "23514") return t.errors.valueNotAllowed;
+  if (e.code === "42501") return t.errors.noPermission;
   return msg;
 }
 

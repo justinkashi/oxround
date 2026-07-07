@@ -15,12 +15,12 @@ const daysAgo = (d: number, h = 9) => {
 };
 
 export const demoMembers: GymMember[] = [
-  { id: "m1", gym_id: "g1", first_name: "Marco", last_name: "Silva", email: "marco@example.com", phone: "514-555-0101", roles: ["member"], status: "active", joined_at: "2025-09-01", emergency_contact: { name: "Ana Silva", phone: "514-555-0111", relation: "spouse" } },
-  { id: "m2", gym_id: "g1", first_name: "Leila", last_name: "Tremblay", email: "leila@example.com", phone: "514-555-0102", roles: ["member"], status: "active", joined_at: "2025-11-15", emergency_contact: null },
-  { id: "m3", gym_id: "g1", first_name: "Dave", last_name: "Nguyen", email: "dave@example.com", phone: "514-555-0103", roles: ["member"], status: "active", joined_at: "2026-01-10", emergency_contact: null },
-  { id: "m4", gym_id: "g1", first_name: "Sophie", last_name: "Gagnon", email: "sophie@example.com", phone: "514-555-0104", roles: ["coach", "member"], status: "active", joined_at: "2024-06-01", emergency_contact: null },
-  { id: "m5", gym_id: "g1", first_name: "Karim", last_name: "Haddad", email: "karim@example.com", phone: "514-555-0105", roles: ["member"], status: "active", joined_at: "2026-03-20", emergency_contact: null },
-  { id: "m6", gym_id: "g1", first_name: "Tony", last_name: "Bélanger", email: "tony@example.com", phone: "514-555-0106", roles: ["coach"], status: "active", joined_at: "2025-02-01", emergency_contact: null },
+  { id: "m1", gym_id: "g1", first_name: "Marco", last_name: "Silva", email: "marco@example.com", phone: "514-555-0101", date_of_birth: "1998-04-12", roles: ["member"], status: "active", joined_at: "2025-09-01", emergency_contact: { name: "Ana Silva", phone: "514-555-0111", relation: "spouse" }, weight_class: "Welterweight" },
+  { id: "m2", gym_id: "g1", first_name: "Leila", last_name: "Tremblay", email: "leila@example.com", phone: "514-555-0102", date_of_birth: "1995-08-24", roles: ["member"], status: "active", joined_at: "2025-11-15", emergency_contact: null, weight_class: "Lightweight" },
+  { id: "m3", gym_id: "g1", first_name: "Dave", last_name: "Nguyen", email: "dave@example.com", phone: "514-555-0103", date_of_birth: "1991-02-03", roles: ["member"], status: "active", joined_at: "2026-01-10", emergency_contact: null, weight_class: "Middleweight" },
+  { id: "m4", gym_id: "g1", first_name: "Sophie", last_name: "Gagnon", email: "sophie@example.com", phone: "514-555-0104", date_of_birth: "1989-11-19", roles: ["coach", "member"], status: "active", joined_at: "2024-06-01", emergency_contact: null, weight_class: "Featherweight" },
+  { id: "m5", gym_id: "g1", first_name: "Karim", last_name: "Haddad", email: "karim@example.com", phone: "514-555-0105", date_of_birth: "2001-06-30", roles: ["member"], status: "active", joined_at: "2026-03-20", emergency_contact: null, weight_class: "Heavyweight" },
+  { id: "m6", gym_id: "g1", first_name: "Tony", last_name: "Bélanger", email: "tony@example.com", phone: "514-555-0106", date_of_birth: "1982-12-05", roles: ["coach"], status: "active", joined_at: "2025-02-01", emergency_contact: null },
 ];
 
 export const demoMemberships: Membership[] = [

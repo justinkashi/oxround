@@ -6,10 +6,12 @@
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { checkInMember, type CheckInResult } from "@/lib/data";
+import { getMessages, useT } from "@/lib/i18n";
 
 type Flash = CheckInResult & { at: number };
 
 export default function ScannerPage() {
+  const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
@@ -63,7 +65,7 @@ export default function ScannerPage() {
           raf = requestAnimationFrame(tick);
         }
       } catch {
-        setError("Camera access was blocked. Allow the camera for this site, then reload.");
+        setError(getMessages().scanner.cameraBlocked);
       }
     })();
 
@@ -75,13 +77,13 @@ export default function ScannerPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Scan check-in</h1>
-      <p className="mb-6 text-sm text-neutral-500">Point the camera at a member&apos;s QR code.</p>
+      <h1 className="mb-1 text-2xl font-bold">{t.scanner.title}</h1>
+      <p className="mb-6 text-sm text-neutral-500">{t.scanner.body}</p>
 
       <div className="relative mx-auto max-w-md overflow-hidden rounded-xl bg-neutral-900">
         <video ref={videoRef} className="w-full" muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
-        {!running && !error && <div className="p-10 text-center text-sm text-neutral-400">Starting camera…</div>}
+        {!running && !error && <div className="p-10 text-center text-sm text-neutral-400">{t.scanner.starting}</div>}
         <div className="pointer-events-none absolute inset-8 rounded-lg border-2 border-white/60" />
 
         {flash && (
@@ -92,9 +94,9 @@ export default function ScannerPage() {
             }`}
           >
             <div className="text-5xl">{flash.ok ? "✓" : "✗"}</div>
-            <div className="mt-2 text-xl font-bold text-white">{flash.name || "Not recognized"}</div>
+            <div className="mt-2 text-xl font-bold text-white">{flash.name || t.scanner.notRecognized}</div>
             <div className="text-sm text-white/90">
-              {flash.ok ? (flash.duplicate ? "Already checked in" : "Welcome!") : flash.reason}
+              {flash.ok ? (flash.duplicate ? t.scanner.alreadyCheckedIn : t.scanner.welcome) : flash.reason}
             </div>
           </div>
         )}
@@ -102,7 +104,7 @@ export default function ScannerPage() {
 
       {error && <p className="mx-auto mt-4 max-w-md rounded-md bg-red-50 p-3 text-center text-sm text-red-700">{error}</p>}
       <p className="mx-auto mt-4 max-w-md text-center text-xs text-neutral-400">
-        Green = checked in. Red = inactive or payment due. Members show their QR from the OxRound app.
+        {t.scanner.hint}
       </p>
     </div>
   );

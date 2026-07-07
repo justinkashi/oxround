@@ -6,10 +6,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { attendanceSummaries, listCheckIns } from "@/lib/data";
 import type { CheckIn, MemberAttendanceSummary } from "@/lib/types";
+import { useFormat, useT } from "@/lib/i18n";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function AttendancePage() {
+  const t = useT();
+  const fmt = useFormat();
   const [summaries, setSummaries] = useState<MemberAttendanceSummary[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
 
@@ -33,53 +36,53 @@ export default function AttendancePage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">Attendance</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t.attendance.title}</h1>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <div className="text-3xl font-bold">{thisMonth}</div>
           <div className="text-sm text-neutral-500">
-            Visits last 30 days {lastMonth > 0 && (
+            {t.attendance.visitsLast30} {lastMonth > 0 && (
               <span className={thisMonth >= lastMonth ? "text-green-600" : "text-red-600"}>
-                ({thisMonth >= lastMonth ? "+" : ""}{(((thisMonth - lastMonth) / lastMonth) * 100).toFixed(0)}% vs prior)
+                {t.attendance.vsPrior(`${thisMonth >= lastMonth ? "+" : ""}${(((thisMonth - lastMonth) / lastMonth) * 100).toFixed(0)}`)}
               </span>
             )}
           </div>
         </div>
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <div className="text-3xl font-bold text-amber-900">{atRisk.length}</div>
-          <div className="text-sm text-amber-800">Members going quiet</div>
+          <div className="text-sm text-amber-800">{t.attendance.quietMembers}</div>
         </div>
         <div className="rounded-lg border border-red-300 bg-red-50 p-4">
-          <div className="text-3xl font-bold text-red-900">${revenueAtRisk.toFixed(0)}/mo</div>
-          <div className="text-sm text-red-800">Revenue at risk if they cancel</div>
+          <div className="text-3xl font-bold text-red-900">{fmt.money(revenueAtRisk)}{t.common.perMonth}</div>
+          <div className="text-sm text-red-800">{t.attendance.revenueRisk}</div>
         </div>
       </div>
 
       <div className="mb-8 rounded-lg border border-neutral-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold">Busiest days</h2>
+        <h2 className="mb-3 font-semibold">{t.attendance.busiestDays}</h2>
         <div className="flex items-end gap-3">
           {byDay.map((d) => (
             <div key={d.name} className="flex flex-1 flex-col items-center gap-1">
               <div className="w-full rounded-t bg-brand/80" style={{ height: `${(d.count / maxDay) * 120}px`, minHeight: 2 }} />
-              <span className="text-xs text-neutral-500">{d.name}</span>
+              <span className="text-xs text-neutral-500">{fmt.date(new Date(2026, 0, 4 + DAY_NAMES.indexOf(d.name)), { weekday: "short" })}</span>
               <span className="text-xs font-medium">{d.count}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <h2 className="mb-3 font-semibold">Per-member summary</h2>
+      <h2 className="mb-3 font-semibold">{t.attendance.perMember}</h2>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
             <tr>
-              <th className="px-4 py-2">Member</th>
-              <th className="px-4 py-2">Last 30 days</th>
-              <th className="px-4 py-2">Prior 30</th>
-              <th className="px-4 py-2">Trend</th>
-              <th className="px-4 py-2">Streak</th>
-              <th className="px-4 py-2">Last visit</th>
+              <th className="px-4 py-2">{t.attendance.member}</th>
+              <th className="px-4 py-2">{t.attendance.last30}</th>
+              <th className="px-4 py-2">{t.attendance.prior30}</th>
+              <th className="px-4 py-2">{t.attendance.trend}</th>
+              <th className="px-4 py-2">{t.attendance.streak}</th>
+              <th className="px-4 py-2">{t.attendance.lastVisit}</th>
             </tr>
           </thead>
           <tbody>
@@ -95,13 +98,13 @@ export default function AttendancePage() {
                   <td className="px-4 py-2">{s.visitsLast30}</td>
                   <td className="px-4 py-2">{s.visitsPrev30}</td>
                   <td className="px-4 py-2">
-                    {dropping ? <span className="font-medium text-amber-700">▼ dropping</span>
-                      : s.visitsLast30 > s.visitsPrev30 ? <span className="text-green-600">▲ up</span>
-                      : <span className="text-neutral-400">— steady</span>}
+                    {dropping ? <span className="font-medium text-amber-700">{t.attendance.dropping}</span>
+                      : s.visitsLast30 > s.visitsPrev30 ? <span className="text-green-600">{t.attendance.up}</span>
+                      : <span className="text-neutral-400">{t.attendance.steady}</span>}
                   </td>
-                  <td className="px-4 py-2">{s.streakWeeks} wk</td>
+                  <td className="px-4 py-2">{s.streakWeeks} {t.attendance.weekShort}</td>
                   <td className="px-4 py-2 text-neutral-500">
-                    {s.lastVisit ? new Date(s.lastVisit).toLocaleDateString("en-CA", { month: "short", day: "numeric" }) : "never"}
+                    {s.lastVisit ? fmt.date(s.lastVisit, { month: "short", day: "numeric" }) : t.attendance.never}
                   </td>
                 </tr>
               );

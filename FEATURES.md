@@ -11,7 +11,7 @@
 
 - ✅/⬜ **Authentication & role routing:** ✅ real magic-link login (invite-only), server-side code exchange, session guard, logout, **one login → role router (owner/manager→CRM, coach/receptionist→restricted CRM, member→/app), member/staff two-way guard, no-access page** (Step 6A/6B). ⬜ join-via-invite-code.
 - ✅/⬜ **Dashboard:** today's classes, attendance, active members, expiring memberships. ✅ **Live check-in feed (realtime)** and **at-risk member alert** already built. **[added: live feed + at-risk were missing from draft]**
-- ✅/⬜ **Member Management:** ✅ list/search/create/**edit fields**/deactivate/**archive + restore (soft-delete, undoable)**/**resend app invite**; batched roster query (no N+1); duplicate-email guard; loading/empty/error states. ⬜ emergency contacts, DOB, medical notes, boxing fields (weight class, skill level, fight record), coach notes, waiver upload, bulk QR card print sheet, **bulk actions** **[added]**, **trial role (walk-in, no booking)** **[added]**, **onboarding lifecycle: add ⇒ Invited (email activation link) ⇒ Joined-unpaid (app access, QR blocked) ⇒ Active on payment confirmation (D-24)** **[added]**.
+- ✅/⬜ **Member Management:** ✅ list/search/create/**edit fields**/deactivate/**archive + restore (soft-delete, undoable)**/**resend app invite**/**header stats (total + new-this-month cards, click to filter)**; ✅ Fighter Card profile fields + edit (first/last/email/phone, DOB→age, weight class, date joined, membership type edit) and Timeline renamed Activity; batched roster query (no N+1); duplicate-email guard; loading/empty/error states. ⬜ emergency contacts, medical notes, full boxing fields (skill level, fight record), coach notes, waiver upload, bulk QR card print sheet, **bulk actions** **[added]**, **trial role (walk-in, no booking)** **[added]**, **onboarding lifecycle: add ⇒ Invited (email activation link) ⇒ Joined-unpaid (app access, QR blocked) ⇒ Active on payment confirmation (D-24)** **[added]**.
 - ✅/⬜ **Attendance Analytics ("Logs" — core must-have):** ✅ busiest days, per-member trends/streaks, drop-off detection, revenue-at-risk number. ⬜ per-class attendance view. **[added — entire section was missing from draft]**
 - ✅/⬜ **Class Scheduling:** ✅ weekly schedule grid, create class, recurring days, capacity limits, coach assignment, class colors, deactivate class, cancel-session flow. ⬜ edit existing class, **auto-notification to booked members on cancellation** **[added]**.
 - ✅/⬜ **Booking Management:** ✅ per-session rosters, waitlist (auto-waitlist when full + promote), spots remaining, cancel/no-show/attended marking, book member from CRM. ⬜ **no-show fees — automated penalty logic (needs G1 decision)** **[added]**, **automatic `attended` reconciliation when a booked member checks in** **[added]**.
@@ -54,7 +54,7 @@
 - ✅ **Resilience layer (VERSION 2):** exponential-backoff retry (1s/2s/4s on 429/502/503 + network drops) on every mutation; idempotency `client_key` on creations (double-click/retry can't duplicate); global toasts; `useSubmit` double-submit guard; friendly DB-error messages.
 - ✅ **DestructiveActionModal:** all 4 destructive actions (archive member, deactivate class, cancel session, remove coach role) go through one modal; archive + deactivate require typing the name.
 - ✅ **Server-side pagination:** members list fetches max 50/page with count + pager; payments capped at 200; filter presets (All / Past due / New this month) pushed to the DB.
-- ⬜ Notification queue with retry · membership-expiry cron + silent-failure alerting · CI/CD pipeline · staging environment · error monitoring · uptime checks · verified backups · privacy policy + 72 h breach procedure + Supabase DPA (Law 25) · i18n scaffolding day 1 (strings English-only) · onboarding email sequence with app-store deep links · "app day" activation playbook.
+- ✅/⬜ ✅ Bilingual EN/FR app shell + full French toggle (typed dictionaries, saved browser preference, localized dates/currency/errors). ⬜ Notification queue with retry · membership-expiry cron + silent-failure alerting · CI/CD pipeline · staging environment · error monitoring · uptime checks · verified backups · privacy policy + 72 h breach procedure + Supabase DPA (Law 25) · onboarding email sequence with app-store deep links · "app day" activation playbook.
 
 ### Twenty-transfer (schema + Fighter Card) — 2026-07-06
 
@@ -63,7 +63,7 @@
 - ✅ **Fighter Card** (`/members/view`): 3-column record page — profile + boxing fields + big green/red MEMBERSHIP CURRENT / PAST DUE badge · Timeline/Notes/Tasks/Files tabs · quick actions (log attendance, record payment, send invite) + QR + attendance stats.
 - ✅ **Leads Kanban upgrades:** per-column $/mo aggregates, estimated-value on leads, convert-to-member guardrail (moving into Converted creates the member, pending-unpaid per D-24, links the lead).
 - ✅ **CSV import validation:** per-row checks (invalid email/phone) listed before import; bad rows never inserted.
-- ⬜ NOT applied to the live DB yet: 0009 (partially — functions chunk applied) + 0010. See README TO DEPLOY.
+- ⬜ NOT applied to the live DB yet: 0009 (partially — functions chunk applied) + 0010 + 0012. See README TO DEPLOY.
 
 ---
 
@@ -77,7 +77,7 @@
 - ⬜ Workout plans / training assignments · **personal-training session bookings (Amir P2)** **[added]**.
 - ⬜ Advanced analytics: MRR, churn, LTV.
 - ⬜ Marketing: referral program, event registration, website add-on widget (public schedule + trial booking → leads).
-- ⬜ Localization: full French toggle (before 5th gym).
+- ✅ Localization: full French toggle (before 5th gym).
 - ⬜ **Coach notes with member-visible option (technique feedback in the member's app)** **[added]** · **Google/Apple social login** **[added]** · **push reminders (class in 1 h, membership expiring)** **[added]** · **automated membership expiry** **[added]** · **product analytics instrumentation** **[added]** · **in-app 3-question feedback survey to owners** **[added]** · **kiosk offline token cache (if G1 reports WiFi issues)** **[added]**.
 
 ---

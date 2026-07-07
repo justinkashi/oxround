@@ -5,13 +5,14 @@
 import { useEffect, useState } from "react";
 import { createAnnouncement, listAnnouncements } from "@/lib/data";
 import type { Announcement, AnnouncementType } from "@/lib/types";
+import { useFormat, useT, type Messages } from "@/lib/i18n";
 
-const TYPES: { value: AnnouncementType; label: string }[] = [
-  { value: "general", label: "General" },
-  { value: "closure", label: "Gym closure" },
-  { value: "fight", label: "Fight announcement" },
-  { value: "event", label: "Event / run" },
-  { value: "schedule_change", label: "Schedule change" },
+const TYPES: { value: AnnouncementType; label: keyof Messages["labels"]["announcementType"] }[] = [
+  { value: "general", label: "general" },
+  { value: "closure", label: "closure" },
+  { value: "fight", label: "fight" },
+  { value: "event", label: "event" },
+  { value: "schedule_change", label: "schedule_change" },
 ];
 
 const TYPE_BADGE: Record<AnnouncementType, string> = {
@@ -23,6 +24,8 @@ const TYPE_BADGE: Record<AnnouncementType, string> = {
 };
 
 export default function AnnouncementsPage() {
+  const t = useT();
+  const fmt = useFormat();
   const [items, setItems] = useState<Announcement[]>([]);
   const [form, setForm] = useState({ title: "", body: "", type: "general" as AnnouncementType, pinned: false });
 
@@ -38,18 +41,18 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-6 text-2xl font-bold">Announcements</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t.announcements.title}</h1>
 
       <form onSubmit={submit} className="mb-8 space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
         <input
           required
-          placeholder="Title — e.g. Gym closed Friday"
+          placeholder={t.announcements.titlePlaceholder}
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
           className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
         />
         <textarea
-          placeholder="Details for your members…"
+          placeholder={t.announcements.detailsPlaceholder}
           value={form.body}
           onChange={(e) => setForm({ ...form, body: e.target.value })}
           rows={3}
@@ -61,35 +64,33 @@ export default function AnnouncementsPage() {
             onChange={(e) => setForm({ ...form, type: e.target.value as AnnouncementType })}
             className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
           >
-            {TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            {TYPES.map((type) => <option key={type.value} value={type.value}>{t.labels.announcementType[type.label]}</option>)}
           </select>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.pinned} onChange={(e) => setForm({ ...form, pinned: e.target.checked })} />
-            Pin to top
+            {t.announcements.pin}
           </label>
           <button type="submit" className="ml-auto rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-            Post + notify members
+            {t.announcements.post}
           </button>
         </div>
-        <p className="text-xs text-neutral-500">
-          Posting sends a push notification to every member with the app and appears in their feed.
-        </p>
+        <p className="text-xs text-neutral-500">{t.announcements.hint}</p>
       </form>
 
       <div className="space-y-3">
         {items.map((a) => (
           <div key={a.id} className="rounded-lg border border-neutral-200 bg-white p-4">
             <div className="mb-1 flex items-center gap-2">
-              {a.pinned && <span title="Pinned">📌</span>}
+              {a.pinned && <span title={t.announcements.pinned}>📌</span>}
               <h2 className="font-semibold">{a.title}</h2>
               <span className={`ml-auto rounded px-2 py-0.5 text-xs font-medium ${TYPE_BADGE[a.type]}`}>
-                {a.type.replace("_", " ")}
+                {t.labels.announcementType[a.type]}
               </span>
             </div>
             {a.body && <p className="mb-2 text-sm text-neutral-700">{a.body}</p>}
             <div className="flex gap-4 text-xs text-neutral-500">
-              <span>{new Date(a.published_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}</span>
-              <span>👁 seen by {a.read_count}</span>
+              <span>{fmt.date(a.published_at, { month: "short", day: "numeric" })}</span>
+              <span>{t.announcements.seenBy(a.read_count)}</span>
               <span>👊 {a.reaction_count}</span>
             </div>
           </div>

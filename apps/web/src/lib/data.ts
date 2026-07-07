@@ -140,6 +140,18 @@ export async function setPaymentStatus(memberId: string, status: PaymentStatus):
   await exec(() => supabase().from("memberships").update({ payment_status: status }).eq("gym_member_id", memberId).eq("status", "active"));
 }
 
+export async function setMembershipPlan(memberId: string, planId: string | null): Promise<void> {
+  if (isDemoMode) {
+    const membership = state.memberships.find((x) => x.gym_member_id === memberId);
+    if (membership) {
+      const plan = planId ? state.plans.find((x) => x.id === planId) : null;
+      membership.plan_name = plan?.name ?? "—";
+    }
+    return;
+  }
+  await exec(() => supabase().from("memberships").update({ plan_id: planId }).eq("gym_member_id", memberId).eq("status", "active"));
+}
+
 // A3 Interconnected: archive (soft-delete, D-03) — check-in function rejects non-active members.
 export async function setMemberStatus(memberId: string, status: GymMember["status"]): Promise<void> {
   if (isDemoMode) {
@@ -150,10 +162,20 @@ export async function setMemberStatus(memberId: string, status: GymMember["statu
   await exec(() => supabase().from("gym_members").update({ status }).eq("id", memberId));
 }
 
-// Edit a member's contact fields (owner-only per RLS members_owner_update). Emails stored lowercased.
+export type MemberProfileUpdate = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  date_of_birth?: string;
+  joined_at?: string;
+  weight_class?: string;
+};
+
+// Edit a member's profile fields (owner-only per RLS members_owner_update). Emails stored lowercased.
 export async function updateMember(
   id: string,
-  fields: { first_name: string; last_name: string; email: string; phone: string },
+  fields: MemberProfileUpdate,
 ): Promise<void> {
   const clean = {
     first_name: fields.first_name.trim(),
@@ -162,12 +184,16 @@ export async function updateMember(
     phone: fields.phone?.trim() || null,
   };
   if (!clean.first_name) throw new Error("First name is required.");
+  const optional: Partial<Pick<GymMember, "date_of_birth" | "joined_at" | "weight_class">> = {};
+  if ("date_of_birth" in fields) optional.date_of_birth = fields.date_of_birth?.trim() || null;
+  if ("joined_at" in fields) optional.joined_at = fields.joined_at?.trim() || null;
+  if ("weight_class" in fields) optional.weight_class = fields.weight_class?.trim() || null;
   if (isDemoMode) {
     const m = state.members.find((x) => x.id === id);
-    if (m) Object.assign(m, clean);
+    if (m) Object.assign(m, clean, optional);
     return;
   }
-  await exec(() => supabase().from("gym_members").update(clean).eq("id", id));
+  await exec(() => supabase().from("gym_members").update({ ...clean, ...optional }).eq("id", id));
 }
 
 export async function listArchivedMembers(): Promise<GymMember[]> {
@@ -178,6 +204,30 @@ export async function listArchivedMembers(): Promise<GymMember[]> {
 }
 
 export type MemberWithMembership = { member: GymMember; membership: Membership | null };
+
+// Header stats for the Members page: non-archived total + joined this month.
+export type MemberStats = { total: number; newThisMonth: number };
+
+export async function getMemberStats(): Promise<MemberStats> {
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  const monthStartIso = monthStart.toISOString().slice(0, 10);
+  if (isDemoMode) {
+    const active = state.members.filter((m) => m.status !== "archived");
+    return {
+      total: active.length,
+      newThisMonth: active.filter((m) => (m.joined_at ?? m.created_at ?? "") >= monthStartIso).length,
+    };
+  }
+  const sb = supabase();
+  const [all, recent] = await Promise.all([
+    sb.from("gym_members").select("id", { count: "exact", head: true }).neq("status", "archived"),
+    sb.from("gym_members").select("id", { count: "exact", head: true }).neq("status", "archived").gte("created_at", monthStartIso),
+  ]);
+  if (all.error) throw new Error(all.error.message);
+  if (recent.error) throw new Error(recent.error.message);
+  return { total: all.count ?? 0, newThisMonth: recent.count ?? 0 };
+}
 
 // Filter presets shown as chips on the Members page (Twenty "views", lite).
 export type MemberFilter = "all" | "past_due" | "new_this_month";
