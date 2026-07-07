@@ -27,7 +27,7 @@ export default function AnnouncementsPage() {
   const t = useT();
   const fmt = useFormat();
   const [items, setItems] = useState<Announcement[]>([]);
-  const [form, setForm] = useState({ title: "", body: "", type: "general" as AnnouncementType, pinned: false });
+  const [form, setForm] = useState({ title: "", body: "", type: "general" as AnnouncementType, pinned: false, notifyMembers: false });
 
   const load = () => listAnnouncements().then(setItems);
   useEffect(() => { load(); }, []);
@@ -35,7 +35,7 @@ export default function AnnouncementsPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     await createAnnouncement(form);
-    setForm({ title: "", body: "", type: "general", pinned: false });
+    setForm({ title: "", body: "", type: "general", pinned: false, notifyMembers: false });
     load();
   };
 
@@ -58,7 +58,7 @@ export default function AnnouncementsPage() {
           rows={3}
           className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
         />
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <select
             value={form.type}
             onChange={(e) => setForm({ ...form, type: e.target.value as AnnouncementType })}
@@ -69,6 +69,10 @@ export default function AnnouncementsPage() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.pinned} onChange={(e) => setForm({ ...form, pinned: e.target.checked })} />
             {t.announcements.pin}
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.notifyMembers} onChange={(e) => setForm({ ...form, notifyMembers: e.target.checked })} />
+            {t.announcements.notifyMembers}
           </label>
           <button type="submit" className="ml-auto rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
             {t.announcements.post}

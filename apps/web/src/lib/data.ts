@@ -672,13 +672,49 @@ export async function listAnnouncements(): Promise<Announcement[]> {
   }));
 }
 
-export async function createAnnouncement(input: { title: string; body: string; type: Announcement["type"]; pinned: boolean }): Promise<void> {
+export async function createAnnouncement(input: { title: string; body: string; type: Announcement["type"]; pinned: boolean; notifyMembers?: boolean }): Promise<void> {
+  const title = input.title.trim();
+  const body = input.body.trim() || null;
   if (isDemoMode) {
-    state.announcements.unshift({ id: `a${Date.now()}`, published_at: new Date().toISOString(), read_count: 0, reaction_count: 0, media_urls: [], ...input });
+    state.announcements.unshift({
+      id: `a${Date.now()}`,
+      title,
+      body,
+      type: input.type,
+      pinned: input.pinned,
+      published_at: new Date().toISOString(),
+      read_count: 0,
+      reaction_count: 0,
+      media_urls: [],
+    });
     return;
   }
   const gymId = await getMyGymId();
-  await exec(() => supabase().from("announcements").insert({ ...input, gym_id: gymId }));
+  const authorId = await currentMemberId();
+  if (!gymId || !authorId) throw new Error("Could not determine your gym account. Log out and back in.");
+  const announcement = await exec(() => supabase()
+    .from("announcements")
+    .insert({ title, body, type: input.type, pinned: input.pinned, gym_id: gymId, author_id: authorId })
+    .select("id")
+    .single()) as { id: string };
+
+  if (!input.notifyMembers) return;
+  const { data: recipients, error } = await supabase()
+    .from("gym_members")
+    .select("id")
+    .eq("gym_id", gymId)
+    .eq("status", "active")
+    .contains("roles", ["member"]);
+  if (error) throw new Error(error.message);
+  const rows = ((recipients ?? []) as Array<{ id: string }>).map((member) => ({
+    gym_id: gymId,
+    recipient_id: member.id,
+    type: "announcement",
+    title,
+    body,
+    data: { announcement_id: announcement.id },
+  }));
+  if (rows.length) await exec(() => supabase().from("notifications").insert(rows));
 }
 
 // ============ MEMBERSHIP PLANS ============

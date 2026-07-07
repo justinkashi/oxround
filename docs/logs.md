@@ -1,4 +1,8 @@
-July 5 
+July 7 
+
+- would be nice to organize a way to implement multiple features in different tasks/chats of codex/claude in parallel because it is "dangerous" to run different tasks as they may modify the same file, so how would I address this, different branches of github ? i want different chats because sequentially implementing tasks will use up the context and usage very fast as I noticed on claude and codex both.
+
+ July 5
 
 * adding glofit as competitors in the list
 * Whats the status of QR codes
@@ -20,9 +24,7 @@ July 2
 - Justin: include a creative and warm human aspect: on start have like a door opening like the bellum tft map like the demon slayer all the japanese doors opening in a certain way but its photos of the gym owner/ restaurant owner so it gives the human touch and power to the owner and ownership instead of bland generic tech. Also give it some apple themes for impression
 - .
 
-
 Feartures to work on:
-
 
 **Data and setup**
 
@@ -58,7 +60,6 @@ Feartures to work on:
 * Post-launch optimization: refining workflows based on usage, feature requests per gym
 * Monthly review of ops metrics with the owner (renewal rate, attendance trends)
 
-
 4 main features MVP must have:
 
 - scan to enter (every member has their own unique QR code)
@@ -73,7 +74,6 @@ Feartures to work on:
 ---
 
 Amir features list:
-
 
 something 20 gyms will happily pay for.
 
