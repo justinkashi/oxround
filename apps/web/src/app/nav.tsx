@@ -27,10 +27,6 @@ const nav: { href: string; label: keyof Messages["nav"]; roles?: string[] }[] = 
   { href: "/settings", label: "settings", roles: ["owner", "manager"] },
 ];
 
-const extras: { href: string; label: keyof Messages["nav"] }[] = [
-  { href: "/app", label: "memberAppPreview" },
-];
-
 function visibleNav(roles: string[]) {
   return nav.filter((n) => !n.roles || n.roles.some((r) => roles.includes(r)));
 }
@@ -52,11 +48,6 @@ function NavLinks({ roles, onNavigate }: { roles: string[]; onNavigate?: () => v
         ))}
       </nav>
       <div className="mt-8 space-y-1 border-t border-neutral-200 pt-4">
-        {extras.map((n) => (
-          <Link key={n.href} href={n.href} onClick={onNavigate} className="block rounded-md px-3 py-2 text-sm font-medium text-neutral-500 hover:bg-neutral-50">
-            {t.nav[n.label]}
-          </Link>
-        ))}
         <div className="px-3 pt-2"><LanguageToggle /></div>
       </div>
     </>

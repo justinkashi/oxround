@@ -32,7 +32,7 @@
 
 ### Member App & Kiosk (Mobile/Tablet)
 
-> ✅ **Web preview of the member app is live at `/app`** (phone-framed, real shared data, doors splash, booking works).
+> ✅ **Member app is live at `/app`** — full-screen (no CRM sidebar, no iPhone frame; phone-width column centered on desktop), real member data, doors splash, booking works. Members log in and land straight in it; staff never see it (preview link removed).
 > **Direction (D-19):** ship the member app as a WEBSITE/PWA first (wire this preview to real member logins + data), native iOS/Android later. Statuses below track the real member-facing app; "(preview ✅)" = built as the web preview, needs real-data wiring.
 
 - ⬜ **Splash & Login:** doors-opening owner-photo splash *(preview ✅)*, welcome flow, email OTP login.

@@ -95,8 +95,7 @@ export default function MemberApp() {
   const initials = `${me?.first_name?.[0] ?? ""}${me?.last_name?.[0] ?? ""}`;
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative h-[720px] w-[360px] overflow-hidden rounded-[2.5rem] border-8 border-neutral-900 bg-neutral-50 shadow-2xl">
+    <div className="relative flex h-full flex-1 flex-col overflow-hidden bg-neutral-50">
         {splash && (
           <div className="absolute inset-0 z-50">
             <div className="absolute inset-y-0 left-0 w-1/2 bg-neutral-950" style={{ animation: "oxDoorL 1.2s 0.6s forwards" }} />
@@ -122,7 +121,7 @@ export default function MemberApp() {
 
         {bookedMsg && <div className="bg-green-600 px-4 py-2 text-center text-xs font-medium text-white">{bookedMsg} ✓</div>}
 
-        <div className="h-[560px] overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-4 py-3">
           {!me ? (
             <div className="py-10 text-center text-sm text-neutral-400">{t.memberApp.noMembership}</div>
           ) : tab === "home" ? (
@@ -258,7 +257,7 @@ export default function MemberApp() {
           )}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 flex border-t border-neutral-200 bg-white">
+        <div className="flex border-t border-neutral-200 bg-white">
           {([["home", "🏠"], ["community", "💬"], ["myox", "🔥"], ["qr", "▣"], ["more", "⋯"]] as const).map(([key, icon]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`flex flex-1 flex-col items-center py-2.5 text-xs ${tab === key ? "font-semibold text-brand" : "text-neutral-400"}`}>
@@ -267,6 +266,5 @@ export default function MemberApp() {
           ))}
         </div>
       </div>
-    </div>
   );
 }

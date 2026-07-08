@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Nav from "./nav";
+import Shell from "./shell";
 import { Toasts } from "@/components/toast";
 import { LocaleProvider } from "@/lib/i18n";
 
@@ -14,10 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <LocaleProvider>
-          <div className="flex min-h-screen flex-col md:flex-row">
-            <Nav />
-            <main className="flex-1 p-4 md:p-8">{children}</main>
-          </div>
+          <Shell>{children}</Shell>
           <Toasts />
         </LocaleProvider>
       </body>
