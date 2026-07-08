@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const DEMO_PROJECT_REF = "qgyfbebqlggcxsjmnmhh";
 
 function safeNext(raw: string | null): string {
@@ -29,16 +32,22 @@ export async function GET(request: Request) {
   }
 
   const cookieStore = await cookies();
+  const redirectTo = `${origin}${safeNext(searchParams.get("next"))}`;
+  const response = NextResponse.redirect(redirectTo);
   const supabase = createServerClient(url, anon, {
     cookies: {
       getAll: () => cookieStore.getAll(),
-      setAll: (list) =>
-        list.forEach(({ name, value, options }) => cookieStore.set(name, value, options)),
+      setAll: (list) => {
+        list.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+          response.cookies.set(name, value, options);
+        });
+      },
     },
   });
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
 
-  return NextResponse.redirect(`${origin}${safeNext(searchParams.get("next"))}`);
+  return response;
 }
