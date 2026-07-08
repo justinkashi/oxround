@@ -5,8 +5,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback", "/no-access"];
+const DEMO_PROJECT_REF = "qgyfbebqlggcxsjmnmhh";
+const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback", "/auth/demo", "/no-access"];
+const DEMO_AUTO_LOGIN_SKIP_PATHS = ["/auth/confirm", "/auth/callback", "/auth/demo", "/no-access"];
 const STAFF_ROLES = ["owner", "manager", "coach", "receptionist"];
+
+function isDemoAutoLoginEnabled(supabaseUrl: string): boolean {
+  return process.env.DEMO_AUTO_LOGIN === "true" && supabaseUrl.includes(DEMO_PROJECT_REF);
+}
 
 // Decode roles[] from the access-token JWT payload (already validated via getUser).
 function rolesFromToken(token: string | undefined): string[] {
@@ -44,6 +50,14 @@ export default async function proxy(req: NextRequest) {
 
   const path = req.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+  const skipDemoAutoLogin = DEMO_AUTO_LOGIN_SKIP_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+
+  if (!user && isDemoAutoLoginEnabled(url) && !skipDemoAutoLogin) {
+    const demoUrl = req.nextUrl.clone();
+    demoUrl.pathname = "/auth/demo";
+    demoUrl.searchParams.set("next", `${path}${req.nextUrl.search}`);
+    return NextResponse.redirect(demoUrl);
+  }
 
   // Auth links land anywhere with ?code= — forward to the callback.
   if (!user && req.nextUrl.searchParams.has("code") && !isPublic) {
