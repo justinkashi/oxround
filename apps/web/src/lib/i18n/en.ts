@@ -257,6 +257,10 @@ export const en = {
     noCode: "No sign-in code in the link. Request a new magic link.",
     expiredOrBrowser: "The link may have expired, or was opened in a different browser than the one that requested it.",
     backToLogin: "Back to login",
+    confirmTitle: "Confirm your sign-in",
+    confirmBody: "Tap the button below to finish signing in.",
+    confirmButton: "Confirm & sign in",
+    confirming: "Signing you in…",
   },
   noAccess: {
     title: "No access yet",

@@ -256,6 +256,10 @@ export const fr: Messages = {
     noCode: "Aucun code de connexion dans le lien. Demandez un nouveau lien magique.",
     expiredOrBrowser: "Le lien a peut-être expiré, ou il a été ouvert dans un autre navigateur que celui qui l'a demandé.",
     backToLogin: "Retour à la connexion",
+    confirmTitle: "Confirmez votre connexion",
+    confirmBody: "Appuyez sur le bouton ci-dessous pour terminer la connexion.",
+    confirmButton: "Confirmer et se connecter",
+    confirming: "Connexion en cours…",
   },
   noAccess: {
     title: "Aucun accès pour l'instant",

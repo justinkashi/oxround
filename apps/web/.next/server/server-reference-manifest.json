@@ -1,5 +1,18 @@
 {
-  "node": {},
+  "node": {
+    "401904a5f5df4033404acb2b1e5a0997ee5009c14a": {
+      "workers": {
+        "app/auth/confirm/page": {
+          "moduleId": 10306,
+          "async": false,
+          "exportedName": "confirmAuth",
+          "filename": "apps/web/src/app/auth/confirm/actions.ts"
+        }
+      },
+      "filename": "apps/web/src/app/auth/confirm/actions.ts",
+      "exportedName": "confirmAuth"
+    }
+  },
   "edge": {},
   "encryptionKey": "FUiq96LIjn6BUqQqUJy6ihzQMPmGX01Z7A7mc+8IY50="
 }
