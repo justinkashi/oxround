@@ -1,11 +1,10 @@
 "use client";
 // Login. Real mode: Supabase magic link → /auth/confirm (server-side code exchange).
 // Signups disabled project-wide (invite-only), so shouldCreateUser: false.
-// Demo mode: mock continue button.
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { isDemoMode, supabase } from "@/lib/data";
+import { useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/data";
 import { LanguageToggle, useT, type Messages } from "@/lib/i18n";
 
 export default function LoginPage() {
@@ -27,16 +26,11 @@ function LoginInner() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(useSearchParamsError());
   const [busy, setBusy] = useState(false);
-  const router = useRouter();
   const tab = ROLE_TABS.find((t) => t.id === role)!;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (isDemoMode) {
-      setSent(true);
-      return;
-    }
     setBusy(true);
     const { error } = await supabase().auth.signInWithOtp({
       email,
@@ -107,19 +101,9 @@ function LoginInner() {
             <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
               {t.login.linkSentBefore} <span className="font-semibold">{email}</span>{t.login.linkSentAfter}
             </div>
-            {isDemoMode && (
-              <button
-                onClick={() => router.push(role === "member" ? "/app" : "/")}
-                className="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white"
-              >
-                {t.login.demoContinue}
-              </button>
-            )}
-            {!isDemoMode && (
-              <button onClick={() => setSent(false)} className="text-xs text-neutral-500 hover:underline">
-                {t.login.useDifferentEmail}
-              </button>
-            )}
+            <button onClick={() => setSent(false)} className="text-xs text-neutral-500 hover:underline">
+              {t.login.useDifferentEmail}
+            </button>
           </div>
         )}
 

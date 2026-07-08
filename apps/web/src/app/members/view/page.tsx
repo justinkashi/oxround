@@ -19,6 +19,7 @@ import { notify } from "@/components/toast";
 import type {
   Attachment, CheckIn, CoachNote, GymMember, GymTask, Membership, MembershipPlan, PaymentStatus, TimelineEvent,
 } from "@/lib/types";
+import { SKILL_LEVELS } from "@/lib/types";
 import { useFormat, useT } from "@/lib/i18n";
 
 const PAYMENT_OPTIONS: PaymentStatus[] = ["paid", "pending", "overdue", "comped"];
@@ -255,6 +256,7 @@ function EditProfileModal({ member, membership, plans, busy, onSave, onCancel }:
     phone: member.phone ?? "",
     date_of_birth: member.date_of_birth ?? "",
     weight_class: member.weight_class ?? "",
+    skill_level: member.skill_level ?? "",
     joined_at: member.joined_at ?? "",
   });
   const [planId, setPlanId] = useState(membership?.id ? (plans.find((plan) => plan.name === membership.plan_name)?.id ?? "") : "");
@@ -289,6 +291,17 @@ function EditProfileModal({ member, membership, plans, busy, onSave, onCancel }:
               />
             </label>
           ))}
+          <label>
+            <span className="mb-1 block text-xs font-medium uppercase text-neutral-500">{t.members.labelSkillLevel}</span>
+            <select
+              value={form.skill_level}
+              onChange={(e) => setForm({ ...form, skill_level: e.target.value })}
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            >
+              <option value="">{t.memberView.none}</option>
+              {SKILL_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
+            </select>
+          </label>
           <label className="sm:col-span-2">
             <span className="mb-1 block text-xs font-medium uppercase text-neutral-500">{t.memberView.plan}</span>
             <select

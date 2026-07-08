@@ -1,11 +1,11 @@
 "use client";
 // Responsive nav: desktop = fixed sidebar (unchanged look); mobile = top bar + hamburger.
-// Real mode: shows the signed-in email + logout. Demo mode: shows nothing extra.
+// Shows the signed-in email + logout.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getMyRoles, getOwnerNotifications, isDemoMode, supabase, type OwnerNotification } from "@/lib/data";
+import { getMyRoles, getOwnerNotifications, supabase, type OwnerNotification } from "@/lib/data";
 import { LanguageToggle, useT, type Messages } from "@/lib/i18n";
 
 // `roles` = who can see the tab. Empty = everyone (staff). D-21 permissions matrix.
@@ -32,7 +32,6 @@ const extras: { href: string; label: keyof Messages["nav"] }[] = [
 ];
 
 function visibleNav(roles: string[]) {
-  // Demo mode (roles=[owner]) sees everything. Staff see tabs allowed for their role.
   return nav.filter((n) => !n.roles || n.roles.some((r) => roles.includes(r)));
 }
 
@@ -111,11 +110,10 @@ function UserBox() {
   const router = useRouter();
 
   useEffect(() => {
-    if (isDemoMode) return;
     supabase().auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
   }, []);
 
-  if (isDemoMode || !email) return null;
+  if (!email) return null;
   return (
     <div className="mt-6 border-t border-neutral-200 pt-3">
       <div className="truncate px-3 text-xs text-neutral-500" title={email}>{email}</div>

@@ -1,6 +1,6 @@
 // Route guard + role router (DEPLOY.md Step 6A).
 // Real mode: requires a session; routes by role — staff → CRM, member → /app.
-// Roles come from the JWT (custom_access_token_hook). Demo mode: no-op.
+// Roles come from the JWT (custom_access_token_hook).
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
@@ -23,7 +23,9 @@ function rolesFromToken(token: string | undefined): string[] {
 export default async function proxy(req: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return NextResponse.next(); // demo mode
+  if (!url || !anon) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. OxRound requires Supabase for all app runs.");
+  }
 
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(url, anon, {

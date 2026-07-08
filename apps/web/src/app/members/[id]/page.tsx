@@ -1,6 +1,4 @@
-// Legacy route — superseded by /members/view?id=<id> (query-param route works in
-// static export for the public demo). Kept as a redirect stub; generateStaticParams
-// + dynamicParams=false make it a no-op under `output: "export"`.
+// Legacy route — superseded by /members/view?id=<id>.
 import { redirect } from "next/navigation";
 
 export const dynamicParams = false;

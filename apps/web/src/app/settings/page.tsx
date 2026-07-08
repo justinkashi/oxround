@@ -2,7 +2,7 @@
 // Gym settings: business info, hours, cancellation policy. (FEATURES: Settings & Customization)
 
 import { useEffect, useState } from "react";
-import { getSettings, saveSettings, isDemoMode } from "@/lib/data";
+import { getSettings, saveSettings } from "@/lib/data";
 import type { GymSettings } from "@/lib/types";
 import { useT } from "@/lib/i18n";
 
@@ -58,7 +58,6 @@ export default function SettingsPage() {
           <li>{t.settings.kiosk}</li>
           <li>{t.settings.featureFlags}</li>
         </ul>
-        {isDemoMode && <p className="mt-2 text-xs">{t.settings.demo}</p>}
       </div>
     </div>
   );

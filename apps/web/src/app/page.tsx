@@ -1,9 +1,8 @@
 "use client";
-// C1 Dashboard: stats + live check-in feed (A2). In real mode the feed subscribes
-// to Supabase Realtime on check_ins; in demo mode it polls session state.
+// C1 Dashboard: stats + live check-in feed (A2).
 
 import { useEffect, useState } from "react";
-import { attendanceSummaries, isDemoMode, listCheckIns, listMembers, supabase } from "@/lib/data";
+import { attendanceSummaries, listCheckIns, listMembers, supabase } from "@/lib/data";
 import type { CheckIn, MemberAttendanceSummary } from "@/lib/types";
 import { useFormat, useT } from "@/lib/i18n";
 
@@ -21,15 +20,11 @@ export default function Dashboard() {
       setSummaries(await attendanceSummaries());
     };
     load();
-    if (!isDemoMode) {
-      const ch = supabase()
-        .channel("check_ins_feed")
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "check_ins" }, load)
-        .subscribe();
-      return () => { supabase().removeChannel(ch); };
-    }
-    const t = setInterval(load, 3000);
-    return () => clearInterval(t);
+    const ch = supabase()
+      .channel("check_ins_feed")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "check_ins" }, load)
+      .subscribe();
+    return () => { supabase().removeChannel(ch); };
   }, []);
 
   const today = feed.filter((c) => new Date(c.checked_in_at).toDateString() === new Date().toDateString());

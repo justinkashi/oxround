@@ -1,12 +1,12 @@
 "use client";
 // Member web app (Step 6C + D-22). In real mode shows the signed-in member's own data;
-// in demo mode shows Marco. Tabs: Home · MyOx · My QR · More (schedule + profile).
+// tabs: Home · MyOx · My QR · More (schedule + profile).
 // My QR encodes "oxround:checkin:<id>" and is gated by payment status (D-20).
 
 import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
-  addBooking, bookingCounts, getCurrentMember, getMembership, isDemoMode,
+  addBooking, bookingCounts, getCurrentMember, getMembership,
   listAnnouncements, listSessions, memberCheckIns, myMessages, myQrActive, sendMessage,
 } from "@/lib/data";
 import type { Announcement, CheckIn, ClassSession, GymMember, Membership, Message } from "@/lib/types";
@@ -96,12 +96,6 @@ export default function MemberApp() {
 
   return (
     <div className="flex flex-col items-center">
-      {isDemoMode && (
-        <p className="mb-4 max-w-md text-center text-sm text-neutral-500">
-          {t.memberApp.demoPreview} <span className="font-medium">{me?.first_name} {me?.last_name}</span>. {t.memberApp.sameData}
-        </p>
-      )}
-
       <div className="relative h-[720px] w-[360px] overflow-hidden rounded-[2.5rem] border-8 border-neutral-900 bg-neutral-50 shadow-2xl">
         {splash && (
           <div className="absolute inset-0 z-50">

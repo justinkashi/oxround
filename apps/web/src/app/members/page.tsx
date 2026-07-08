@@ -1,5 +1,5 @@
 "use client";
-// C2 Member management: list, search, filter, create. (Demo slice feature 1 / A3)
+// C2 Member management: list, search, filter, create. (A3)
 
 import { useEffect, useState } from "react";
 import Link from "next/link";

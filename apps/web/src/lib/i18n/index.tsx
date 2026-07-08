@@ -2,7 +2,6 @@
 // Bilingual support (EN default / FR toggle). No library — a context provider,
 // two typed dictionaries (en.ts / fr.ts) and locale-aware Intl formatters.
 // The choice persists per browser in localStorage ("oxround-locale").
-// Works in both server builds and the static-export demo (all client-side).
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { en, type Messages } from "./en";

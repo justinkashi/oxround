@@ -21,9 +21,22 @@ export interface GymMember {
   created_at?: string;
   // Boxing profile (D-07) — in the DB since 0001, surfaced on the Fighter Card.
   weight_class?: string | null;
-  skill_level?: string | null;
+  skill_level?: SkillLevel | null;
   fight_record?: { wins: number; losses: number; draws: number } | null;
   medical_notes?: string | null;
+  // Coach weekly availability (migration 0015). Empty/undefined = not set.
+  availability?: AvailabilityWindow[] | null;
+}
+
+// Fixed boxing skill ladder (G1) — replaces free-text skill level.
+export const SKILL_LEVELS = ["Beginner", "Amateur", "Open", "Elite", "Pro"] as const;
+export type SkillLevel = (typeof SKILL_LEVELS)[number];
+
+// One block of time a coach can teach. day: 0=Sun … 6=Sat, times as "HH:MM".
+export interface AvailabilityWindow {
+  day: number;
+  start: string;
+  end: string;
 }
 
 // ---- Twenty-transfer types (migration 0010) ----
