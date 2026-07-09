@@ -4,26 +4,14 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { resolveHome, rolesFromToken, STAFF_ROLES } from "@/lib/auth";
 
 const DEMO_PROJECT_REF = "qgyfbebqlggcxsjmnmhh";
 const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback", "/auth/demo", "/no-access"];
 const DEMO_AUTO_LOGIN_SKIP_PATHS = ["/auth/confirm", "/auth/callback", "/auth/demo", "/no-access"];
-const STAFF_ROLES = ["owner", "manager", "coach", "receptionist"];
 
 function isDemoAutoLoginEnabled(supabaseUrl: string): boolean {
   return process.env.DEMO_AUTO_LOGIN === "true" && supabaseUrl.includes(DEMO_PROJECT_REF);
-}
-
-// Decode roles[] from the access-token JWT payload (already validated via getUser).
-function rolesFromToken(token: string | undefined): string[] {
-  if (!token) return [];
-  try {
-    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = JSON.parse(atob(payload));
-    return Array.isArray(json.roles) ? json.roles : [];
-  } catch {
-    return [];
-  }
 }
 
 export default async function proxy(req: NextRequest) {
@@ -88,7 +76,7 @@ export default async function proxy(req: NextRequest) {
     };
 
     // Landed on /login while authed → send to the right home.
-    if (path === "/login") return redirectTo(isStaff ? "/" : isMember ? "/app" : "/no-access");
+    if (path === "/login") return redirectTo(resolveHome(roles));
 
     // No usable role at all → explain, don't loop.
     if (!isStaff && !isMember && !isPublic) return redirectTo("/no-access");

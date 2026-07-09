@@ -14,6 +14,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { resolveHome, rolesFromToken } from "@/lib/auth";
 
 export async function confirmAuth(formData: FormData) {
   const code = (formData.get("code") as string) || null;
@@ -33,7 +34,8 @@ export async function confirmAuth(formData: FormData) {
     },
   );
 
-  let dest = "/";
+  // "" = session established, route by role below. Anything else = an error page.
+  let dest = "";
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (error) dest = `/login?error=${encodeURIComponent(error.message)}`;
@@ -44,6 +46,13 @@ export async function confirmAuth(formData: FormData) {
     else await supabase.rpc("mark_member_activated");
   } else {
     dest = "/login?error=no_code";
+  }
+
+  // Route by role at the moment the session is created, so members land straight in
+  // /app instead of flashing the CRM and getting corrected by the proxy a click later.
+  if (!dest) {
+    const { data: { session } } = await supabase.auth.getSession();
+    dest = resolveHome(rolesFromToken(session?.access_token));
   }
 
   redirect(dest); // throws NEXT_REDIRECT — must stay outside any try/catch

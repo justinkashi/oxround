@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/data";
+import { resolveHome, rolesFromToken } from "@/lib/auth";
 import { getMessages, useT } from "@/lib/i18n";
 
 function CallbackInner() {
@@ -27,9 +28,9 @@ function CallbackInner() {
     }
     supabase()
       .auth.exchangeCodeForSession(code)
-      .then(({ error }) => {
+      .then(({ data, error }) => {
         if (error) setError(`${error.message}. ${getMessages().auth.expiredOrBrowser}`);
-        else router.replace("/");
+        else router.replace(resolveHome(rolesFromToken(data.session?.access_token)));
       });
   }, [params, router]);
 
