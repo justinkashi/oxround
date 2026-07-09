@@ -42,11 +42,13 @@ export async function confirmAuth(_prev: unknown, formData: FormData): Promise<{
   // "" = session established, route by role below. Anything else = an error page.
   let dest = "";
   let token: string | undefined; // access token from the verify — carries roles[] claims
+  let passwordSet = false; // has this user already chosen a password? (user_metadata flag)
   if (tokenHash && type) {
     const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (error) dest = `/login?error=${encodeURIComponent(error.message)}`;
     else {
       token = data.session?.access_token;
+      passwordSet = data.user?.user_metadata?.password_set === true;
       await supabase.rpc("mark_member_activated"); // idempotent; no-op if not a member
     }
   } else if (code) {
@@ -54,16 +56,19 @@ export async function confirmAuth(_prev: unknown, formData: FormData): Promise<{
     if (error) dest = `/login?error=${encodeURIComponent(error.message)}`;
     else {
       token = data.session?.access_token;
+      passwordSet = data.user?.user_metadata?.password_set === true;
       await supabase.rpc("mark_member_activated");
     }
   } else {
     dest = "/login?error=no_code";
   }
 
-  // Route by role at the moment the session is created, so members land straight in
-  // /app instead of flashing the CRM and getting corrected by the proxy a click later.
-  // Use the token returned by the verify itself (not a second getSession round-trip).
-  if (!dest) dest = resolveHome(rolesFromToken(token));
+  // First time in (any role) and no password chosen yet → nudge them to set one so
+  // next time they can sign in without an email link. The screen is skippable, so
+  // nobody is locked out. Once a password exists they sign in directly and never
+  // hit this action again. Otherwise route by role at the moment the session is
+  // created, so members land straight in /app instead of flashing the CRM.
+  if (!dest) dest = passwordSet ? resolveHome(rolesFromToken(token)) : "/auth/set-password";
 
   return { dest };
 }

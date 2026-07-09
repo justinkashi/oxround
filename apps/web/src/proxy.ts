@@ -7,8 +7,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { resolveHome, rolesFromToken, STAFF_ROLES } from "@/lib/auth";
 
 const DEMO_PROJECT_REF = "qgyfbebqlggcxsjmnmhh";
-const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback", "/auth/demo", "/no-access"];
-const DEMO_AUTO_LOGIN_SKIP_PATHS = ["/auth/confirm", "/auth/callback", "/auth/demo", "/no-access"];
+const PUBLIC_PATHS = ["/login", "/auth/confirm", "/auth/callback", "/auth/set-password", "/auth/demo", "/no-access"];
+const DEMO_AUTO_LOGIN_SKIP_PATHS = ["/auth/confirm", "/auth/callback", "/auth/set-password", "/auth/demo", "/no-access"];
 
 function isDemoAutoLoginEnabled(supabaseUrl: string): boolean {
   return process.env.DEMO_AUTO_LOGIN === "true" && supabaseUrl.includes(DEMO_PROJECT_REF);
