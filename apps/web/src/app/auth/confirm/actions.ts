@@ -13,10 +13,15 @@
 import { createServerClient } from "@supabase/ssr";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { resolveHome, rolesFromToken } from "@/lib/auth";
 
-export async function confirmAuth(formData: FormData) {
+// Returns the destination for the CLIENT to navigate to with a full page load
+// (window.location), NOT a server redirect(). The session cookie is set here
+// server-side; a hard navigation forces the browser's Supabase client and the
+// root layout to re-read it, so the landing page renders with the right role
+// instead of the logged-out state left over from /login (which a soft redirect
+// would preserve — that was the "owner sees coach menu until refresh" bug).
+export async function confirmAuth(_prev: unknown, formData: FormData): Promise<{ dest: string }> {
   const code = (formData.get("code") as string) || null;
   const tokenHash = (formData.get("token_hash") as string) || null;
   const type = (formData.get("type") as EmailOtpType | null) || null;
@@ -60,5 +65,5 @@ export async function confirmAuth(formData: FormData) {
   // Use the token returned by the verify itself (not a second getSession round-trip).
   if (!dest) dest = resolveHome(rolesFromToken(token));
 
-  redirect(dest); // throws NEXT_REDIRECT — must stay outside any try/catch
+  return { dest };
 }
