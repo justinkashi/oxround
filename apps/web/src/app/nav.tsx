@@ -5,7 +5,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getMyRoles, getOwnerNotifications, supabase, type OwnerNotification } from "@/lib/data";
+import { getOwnerNotifications, supabase, type OwnerNotification } from "@/lib/data";
+import { rolesFromToken } from "@/lib/auth";
 import { LanguageToggle, useT, type Messages } from "@/lib/i18n";
 
 // `roles` = who can see the tab. Empty = everyone (staff). D-21 permissions matrix.
@@ -122,12 +123,21 @@ function UserBox() {
   );
 }
 
-export default function Nav() {
+export default function Nav({ initialRoles }: { initialRoles: string[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [roles, setRoles] = useState<string[]>([]);
+  // Seeded from the server (correct on first paint). Client auth events keep it
+  // fresh, but never downgrade to empty — a transient empty read must not flash
+  // the trimmed menu over the correct one.
+  const [roles, setRoles] = useState<string[]>(initialRoles);
 
-  useEffect(() => { getMyRoles().then(setRoles); }, []);
+  useEffect(() => {
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((_e, session) => {
+      const next = rolesFromToken(session?.access_token);
+      if (next.length) setRoles(next);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <>

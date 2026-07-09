@@ -6,7 +6,7 @@
 import { usePathname } from "next/navigation";
 import Nav from "./nav";
 
-export default function Shell({ children }: { children: React.ReactNode }) {
+export default function Shell({ children, roles }: { children: React.ReactNode; roles: string[] }) {
   const pathname = usePathname();
   const isMemberApp = pathname === "/app" || pathname.startsWith("/app/");
 
@@ -22,7 +22,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <Nav />
+      <Nav initialRoles={roles} />
       <main className="flex-1 p-4 md:p-8">{children}</main>
     </div>
   );
