@@ -36,24 +36,29 @@ export async function confirmAuth(formData: FormData) {
 
   // "" = session established, route by role below. Anything else = an error page.
   let dest = "";
+  let token: string | undefined; // access token from the verify — carries roles[] claims
   if (tokenHash && type) {
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+    const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (error) dest = `/login?error=${encodeURIComponent(error.message)}`;
-    else await supabase.rpc("mark_member_activated"); // idempotent; no-op if not a member
+    else {
+      token = data.session?.access_token;
+      await supabase.rpc("mark_member_activated"); // idempotent; no-op if not a member
+    }
   } else if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) dest = `/login?error=${encodeURIComponent(error.message)}`;
-    else await supabase.rpc("mark_member_activated");
+    else {
+      token = data.session?.access_token;
+      await supabase.rpc("mark_member_activated");
+    }
   } else {
     dest = "/login?error=no_code";
   }
 
   // Route by role at the moment the session is created, so members land straight in
   // /app instead of flashing the CRM and getting corrected by the proxy a click later.
-  if (!dest) {
-    const { data: { session } } = await supabase.auth.getSession();
-    dest = resolveHome(rolesFromToken(session?.access_token));
-  }
+  // Use the token returned by the verify itself (not a second getSession round-trip).
+  if (!dest) dest = resolveHome(rolesFromToken(token));
 
   redirect(dest); // throws NEXT_REDIRECT — must stay outside any try/catch
 }

@@ -4,10 +4,11 @@
 // My QR encodes "oxround:checkin:<id>" and is gated by payment status (D-20).
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import {
   addBooking, bookingCounts, getCurrentMember, getMembership,
-  listAnnouncements, listSessions, memberCheckIns, myMessages, myQrActive, sendMessage,
+  listAnnouncements, listSessions, memberCheckIns, myMessages, myQrActive, sendMessage, supabase,
 } from "@/lib/data";
 import type { Announcement, CheckIn, ClassSession, GymMember, Membership, Message } from "@/lib/types";
 import { useT } from "@/lib/i18n";
@@ -17,6 +18,7 @@ type Tab = "home" | "community" | "myox" | "qr" | "more";
 
 export default function MemberApp() {
   const t = useT();
+  const router = useRouter();
   const [splash, setSplash] = useState(true);
   const [tab, setTab] = useState<Tab>("home");
   const [me, setMe] = useState<GymMember | null>(null);
@@ -253,6 +255,16 @@ export default function MemberApp() {
                   {membership?.next_billing_date && ` · ${t.memberApp.renews(membership.next_billing_date)}`}
                 </div>
               </div>
+              <button
+                onClick={async () => {
+                  await supabase().auth.signOut();
+                  router.replace("/login");
+                  router.refresh();
+                }}
+                className="mt-2 w-full rounded-xl border border-neutral-200 bg-white py-3 text-sm font-semibold text-brand shadow-sm"
+              >
+                {t.nav.logOut}
+              </button>
             </div>
           )}
         </div>
